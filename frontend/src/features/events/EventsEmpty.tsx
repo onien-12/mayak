@@ -109,6 +109,29 @@ export function EventsEmpty({ activeSearch }: { activeSearch: string }) {
       />
     );
   }
+  if (filters.origin === 'community') {
+    return (
+      <EmptyState
+        icon={Users}
+        title={
+          period
+            ? `Жители ${period} ничего не запланировали`
+            : 'Жители пока ничего не запланировали'
+        }
+        description="Позовите людей сами: забег с собаками, игра во дворе, прогулка, субботник — это пара минут."
+        action={
+          <div className="flex flex-wrap justify-center gap-2">
+            <Button size="sm" icon={Users} onClick={() => startCreateEvent(true)}>
+              Собрать встречу
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => filters.setOrigin('all')}>
+              Показать городскую афишу
+            </Button>
+          </div>
+        }
+      />
+    );
+  }
   return (
     <EmptyState
       icon={CalendarPlus}

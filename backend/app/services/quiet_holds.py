@@ -1,9 +1,11 @@
-"""Quiet holds (SPEC §24.1): lookups and the visibility clauses every listing applies.
+"""Holds of the screening (SPEC §24.1): lookups and the visibility clauses every listing applies.
 
 An item in an active hold (screening or held) is invisible to everyone but its author and
 moderators. Places and routes are additionally kept `pending`, so the ordinary visibility
 rules already hide them; comments, reviews and notes are kept `is_hidden`; photos have no flag
-of their own and are filtered through `active_ids`.
+of their own and are filtered through `active_ids`. During the screening window a place or
+route looks to its author as `shown_status`; once held it is `pending` for them too. The table
+is still called `quiet_holds`: the name is historical, the author is told about a hold.
 """
 
 from collections.abc import Collection
@@ -71,19 +73,27 @@ async def find_active(session: AsyncSession, target_type: AiTarget, target_id: i
 
 
 async def active_by_target(
-    session: AsyncSession, target_type: AiTarget, target_ids: Collection[int]
+    session: AsyncSession,
+    target_type: AiTarget,
+    target_ids: Collection[int],
+    states: Collection[HoldState] = ACTIVE_HOLD_STATES,
 ) -> dict[int, QuietHold]:
-    """Active holds of several items of one kind, in one query."""
+    """Active holds (or those in `states`) of several items of one kind, in one query."""
     if not target_ids:
         return {}
     rows = await session.scalars(
         select(QuietHold).where(
             QuietHold.target_type == target_type,
             QuietHold.target_id.in_(target_ids),
-            QuietHold.state.in_(ACTIVE_HOLD_STATES),
+            QuietHold.state.in_(states),
         )
     )
     return {hold.target_id: hold for hold in rows}
+
+
+async def held_ids(session: AsyncSession, target_type: AiTarget, target_ids: Collection[int]) -> set[int]:
+    """Which of the items did not pass the screening and wait for a moderator."""
+    return set(await active_by_target(session, target_type, target_ids, (HoldState.HELD,)))
 
 
 async def children(session: AsyncSession, parent: QuietHold) -> list[QuietHold]:
@@ -110,10 +120,11 @@ def own_shown_as(
     viewer_id: int,
     statuses: Collection[str],
 ) -> ColumnElement[bool]:
-    """The viewer's own items in an active hold that look to them as one of `statuses`."""
+    """The viewer's own items in a screening window that look to them as one of `statuses`;
+    a held item is `pending` for its author too."""
     shown = select(QuietHold.target_id).where(
         QuietHold.target_type == target_type,
-        QuietHold.state.in_(ACTIVE_HOLD_STATES),
+        QuietHold.state == HoldState.SCREENING,
         QuietHold.author_id == viewer_id,
         QuietHold.shown_status.in_([str(status) for status in statuses]),
     )

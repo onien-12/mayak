@@ -17,7 +17,9 @@ from selectolax.lexbor import LexborHTMLParser
 
 MAX_REVIEWS = 30
 """Stored and served per source: what one request of the source gives, up to this many."""
-MAX_PHOTOS = 8
+MAX_PHOTOS = 30
+"""Photos kept per organisation from the search page the lookup reads anyway — as many as it
+embeds, up to this many; more would take a request of their own."""
 MAX_TEXT_LENGTH = 600
 MAX_TITLE_LENGTH = 200
 PHOTO_SIZE = "L"

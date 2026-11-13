@@ -30,7 +30,7 @@ import {
 
 import { syncPlace } from '../card/usePlace';
 import { areaIdOf, initialAreaChoice, type AreaChoice } from './areaChoice';
-import { AreaField } from './AreaField';
+import { AreaField, AreaNote } from './AreaField';
 import { clearDraft, draftScope, hasContent, readDraft, writeDraft } from './draftStore';
 import { EventFields } from './EventFields';
 import { IssueFields } from './IssueFields';
@@ -129,6 +129,7 @@ export function DetailsStep({
   const [areaChoice, setAreaChoice] = useState<AreaChoice>(() =>
     initialAreaChoice(draft.point, editing, presetAreaId, queryClient),
   );
+  const [areaChanged, setAreaChanged] = useState(false);
   const { permissions } = useAuth();
   const setSnap = usePanelStore((state) => state.setSnap);
   // What was typed here before: the step remounts when the category or the point changes, and
@@ -198,7 +199,10 @@ export function DetailsStep({
   const save = useMutation({
     mutationFn: (values: PlaceFormValues) => {
       const photoIds = photos.map((photo) => photo.id);
-      const located = { ...draft, areaId: areaIdOf(areaChoice) };
+      // An edit that did not touch the location sends none: «не в локации» sent back as an explicit
+      // choice would pin the place outside every location created later.
+      const keepsArea = editing !== undefined && !areaChanged;
+      const located = { ...draft, areaId: keepsArea ? undefined : areaIdOf(areaChoice) };
       return editing
         ? placesApi.update(editing.id, toPlaceUpdate(values, located, photoIds))
         : placesApi.create(toPlaceInput(values, located, photoIds));
@@ -332,7 +336,18 @@ export function DetailsStep({
             />
           </Field>
 
-          <AreaField point={draft.point} value={areaChoice} onChange={setAreaChoice} />
+          {editing ? (
+            <AreaField
+              point={draft.point}
+              value={areaChoice}
+              onChange={(choice) => {
+                setAreaChoice(choice);
+                setAreaChanged(true);
+              }}
+            />
+          ) : (
+            <AreaNote point={draft.point} value={areaChoice} />
+          )}
 
           <Field label="Фото" optional hint="До 8 фото — с ними публикации доверяют больше">
             <PhotoPicker photos={photos} onChange={setPhotos} />

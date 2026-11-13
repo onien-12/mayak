@@ -33,7 +33,7 @@ export function InterestsOnboarding({ onDone }: { onDone: () => void }) {
       saving={save.isPending}
       onSkip={() => finish(local)}
       onSave={finish}
-      description="Аккаунт готов! Отметьте, что вам по душе, — покажем это первым на карте и в афише."
+      description="Аккаунт готов! Отметьте, что вам по душе, — покажем это первым на карте и в событиях."
     />
   );
 }

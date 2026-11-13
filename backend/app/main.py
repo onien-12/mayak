@@ -15,7 +15,7 @@ from app.core.database import Database
 from app.core.errors import register_exception_handlers
 from app.core.rate_limit import SlidingWindowLimiter
 from app.domain import geo
-from app.seed.runner import seed_if_empty
+from app.seed.runner import apply_wikimedia, seed_if_empty
 from app.services import areas, uploads, verification
 from app.services.ai_moderation.client import OpenRouterClient
 from app.services.ai_moderation.screener import AiScreener, ScreeningSweeper
@@ -30,6 +30,8 @@ from app.services.vlru.client import VlRuClient
 
 API_PREFIX = "/api/v1"
 LOG_FORMAT = "%(asctime)s %(levelname)s %(name)s: %(message)s"
+
+logger = logging.getLogger(__name__)
 
 
 def _configure_logging() -> None:
@@ -64,6 +66,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     async with database.session_factory() as session:
         if settings.seed_on_startup:
             await seed_if_empty(session, settings)
+        wikimedia = await apply_wikimedia(session, utcnow())
+        if wikimedia is not None:
+            logger.info("Wikimedia snapshot applied: %s", wikimedia.summary())
         await verification.refresh_trust_scores(session, utcnow())
         await uploads.refresh_covers(session, settings.media_dir, utcnow())
         await areas.refresh_all(session, utcnow())

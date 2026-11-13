@@ -1,7 +1,7 @@
 """The only things a screening result is allowed to do (SPEC §14, §24).
 
 Release an item, release it for a moderator's look (`needs_review`, as before) or keep it
-quietly held until a moderator decides. It never decides after a person has, never rejects,
+held until a moderator decides (its author is told). It never decides after a person has, never rejects,
 deletes or touches reputation; it only moves the hidden author standing.
 """
 
@@ -10,15 +10,13 @@ from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain import ai_moderation
+from app.domain import ai_moderation, levels
 from app.domain import standing as standing_rules
 from app.domain.ai_moderation import AiOpinion, TextOutcome
 from app.domain.enums import AiTarget, HoldSource, HoldState, ModerationTrigger, StandingReason
-from app.models import AiReview, QuietHold
+from app.domain.hold_reasons import TEXT_SUBJECT, UNCHECKED_PHOTO, UNCHECKED_TEXT
+from app.models import AiReview, QuietHold, User
 from app.services import place_quality, quiet_holds, screening, standing
-
-UNCHECKED_TEXT = "Текст не проверен: модель недоступна, а внутренняя оценка автора низкая"
-UNCHECKED_PHOTO = "Фото {index} не проверено: модель недоступна, а внутренняя оценка автора низкая"
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,9 +80,8 @@ def _judge_text(hold: QuietHold, checked: Checked, low: bool, findings: _Finding
         checked.text, standing_low=low, rates_usefulness=rates_usefulness(hold)
     )
     if outcome is TextOutcome.HOLD:
-        findings.add(
-            ai_moderation.describe(checked.text, subject="Текст"), ModerationTrigger.AUTO_AI, HoldSource.AI
-        )
+        reason = ai_moderation.describe(checked.text, subject=TEXT_SUBJECT)
+        findings.add(reason, ModerationTrigger.AUTO_AI, HoldSource.AI)
     return outcome
 
 
@@ -113,13 +110,24 @@ async def _judge_photos(
             photo_hold.updated_at = now
 
 
+async def _on_probation(session: AsyncSession, hold: QuietHold) -> bool:
+    if hold.target_type not in (AiTarget.PLACE, AiTarget.ROUTE):
+        return False
+    author = await session.get(User, hold.author_id)
+    return author is not None and levels.is_on_probation(author.level, author.role)
+
+
 async def apply(
     session: AsyncSession, hold: QuietHold, checked: Checked, *, model: str, now: datetime
 ) -> None:
     """Decide one screening window. An author with low standing gets no benefit of the doubt:
-    a check that did not happen holds, and so does `suspicious` of any confidence."""
+    a check that did not happen holds, and so does `suspicious` of any confidence. The same
+    holds for a newcomer's places and routes (with their photos) — they used to wait for a
+    moderator in any case; their comments, reviews, notes and added photos are judged as usual."""
     await _store(session, hold, checked, model, now)
-    low = standing_rules.is_low(await standing.score(session, hold.author_id))
+    low = standing_rules.is_low(await standing.score(session, hold.author_id)) or await _on_probation(
+        session, hold
+    )
     findings = _Findings()
     if hold.source is HoldSource.HEURISTIC and hold.reasons:
         findings.add(None, ModerationTrigger.AUTO_TEXT, HoldSource.HEURISTIC)

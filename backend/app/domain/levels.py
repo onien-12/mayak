@@ -16,7 +16,7 @@ class LevelRule:
 
 
 LEVEL_RULES: tuple[LevelRule, ...] = (
-    LevelRule(UserLevel.NEWCOMER, None, 0.5, 3, PlaceStatus.PENDING),
+    LevelRule(UserLevel.NEWCOMER, None, 0.5, 3, PlaceStatus.UNVERIFIED),
     LevelRule(UserLevel.RESIDENT, 10, 1.0, 10, PlaceStatus.UNVERIFIED),
     LevelRule(UserLevel.TRUSTED, 50, 1.5, 30, PlaceStatus.UNVERIFIED),
     LevelRule(UserLevel.EXPERT, 150, 2.0, 100, PlaceStatus.PRELIMINARY),
@@ -80,8 +80,16 @@ def daily_place_limit(level: UserLevel, role: UserRole) -> int:
 
 
 def publishes_directly(level: UserLevel, role: UserRole) -> bool:
-    """False for cold mode, where every publication is pre-moderated."""
+    """False for a level whose publications wait for a moderator first. No level does today:
+    a newcomer publishes at once and is screened strictly instead (`is_on_probation`)."""
     return initial_status(level, role) is not PlaceStatus.PENDING
+
+
+def is_on_probation(level: UserLevel, role: UserRole) -> bool:
+    """A newcomer's places and routes get no benefit of the doubt from the automatic check
+    (SPEC §24.1): what the model doubts, or could not check at all, goes to a moderator instead
+    of being shown."""
+    return level is UserLevel.NEWCOMER and not is_staff(role)
 
 
 def can_send_respect(level: UserLevel, role: UserRole) -> bool:

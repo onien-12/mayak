@@ -110,7 +110,8 @@ def _ai_target(case: ModerationCase) -> tuple[AiTarget, int]:
 
 
 async def _quiet_case_ids(session: AsyncSession, cases: list[ModerationCase]) -> set[int]:
-    """Cases whose target is quietly held right now (SPEC §24.1): the author does not know."""
+    """Cases whose target is held by the screening right now (SPEC §24.1): only its author and
+    moderators see it, and the author has been told it did not pass."""
     targets = {_ai_target(case) for case in cases if case.state is CaseState.OPEN}
     if not targets:
         return set()
@@ -386,16 +387,6 @@ def _notify_author(
     )
 
 
-async def _release_quietly(session: AsyncSession, hold: QuietHold | None, now: datetime) -> bool:
-    """`approve` of a quiet hold: the item appears as if it had never been held and nothing
-    else happens to its author (SPEC §24.1). False when the author sees the item waiting for
-    pre-moderation anyway: then the ordinary approval follows."""
-    if hold is None:
-        return False
-    await screening.release(session, hold, now, by_moderator=True)
-    return hold.shown_status not in (PlaceStatus.PENDING, RouteStatus.PENDING, None)
-
-
 async def _decide_siblings(session: AsyncSession, sibling_ids: list[int], place: Place) -> None:
     """Occurrences of an event series screened together share the decision about the first one."""
     for sibling_id in sibling_ids:
@@ -412,21 +403,23 @@ async def _decide_place(
     payload: ResolveIn,
     now: datetime,
 ) -> None:
+    """A place held by the screening is decided like any other: approving it brings back the
+    status it would have had (with the rest of its event series), and the author hears of it."""
     hold = await quiet_holds.find_active(session, AiTarget.PLACE, place.id)
-    old_status = PlaceStatus(hold.shown_status) if hold is not None and hold.shown_status else place.status
+    old_status = await place_queries.shown_status(session, place)
+    intended = await place_queries.intended_status(session, place)
     match payload.action:
         case ModerationAction.APPROVE | ModerationAction.RESTORE:
             if payload.action is ModerationAction.RESTORE and place.status not in _RESTORABLE_PLACE_STATUSES:
                 raise ConflictError("Восстановить можно только скрытую или архивную публикацию.")
             if payload.action is ModerationAction.APPROVE:
                 await _close_complaints(session, case, upheld=False, now=now)
-                if await _release_quietly(session, hold, now):
-                    place.reviewed_at = now
-                    await verification.recompute_place(session, place, now)
-                    return
+                if hold is not None:
+                    # Announces a new place to its territory when it becomes public here.
+                    await screening.release(session, hold, now, by_moderator=True)
             place.reviewed_at = now
             await verification.recompute_place(session, place, now, moderator_override=True)
-            if old_status is PlaceStatus.PENDING:
+            if intended is PlaceStatus.PENDING:
                 await reputation.award(
                     session, place.author, ReputationReason.MODERATION_APPROVED, now=now, place_id=place.id
                 )
@@ -473,17 +466,17 @@ async def _decide_route(
     now: datetime,
 ) -> None:
     hold = await quiet_holds.find_active(session, AiTarget.ROUTE, route.id)
-    old_status = RouteStatus(hold.shown_status) if hold is not None and hold.shown_status else route.status
+    intended = await routes.intended_status(session, route)
     match payload.action:
         case ModerationAction.APPROVE | ModerationAction.RESTORE:
             if payload.action is ModerationAction.RESTORE and route.status is not RouteStatus.HIDDEN:
                 raise ConflictError("Восстановить можно только скрытый маршрут.")
             if payload.action is ModerationAction.APPROVE:
                 await _close_complaints(session, case, upheld=False, now=now)
-                if await _release_quietly(session, hold, now):
-                    return
+                if hold is not None:
+                    await screening.release(session, hold, now, by_moderator=True)
             route.status = RouteStatus.PUBLISHED
-            if old_status is RouteStatus.PENDING:
+            if intended is RouteStatus.PENDING:
                 await reputation.award(session, route.author, ReputationReason.MODERATION_APPROVED, now=now)
                 await reputation.award(session, route.author, ReputationReason.ROUTE_PUBLISHED, now=now)
         case ModerationAction.REJECT | ModerationAction.HIDE:

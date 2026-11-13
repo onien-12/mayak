@@ -23,7 +23,7 @@ from app.domain.geo import BBox
 from app.domain.interests import InterestTarget, Profile, Topic
 from app.models import Area, EventDetails, EventParticipant, Favorite, InterestTag, Place, User
 from app.schemas.interest import Recommendation, Recommendations
-from app.services import areas, combined_ratings, place_quality, place_queries
+from app.services import areas, place_quality, place_queries
 
 DEFAULT_LIMIT = 12
 MAX_LIMIT = 30
@@ -256,7 +256,7 @@ async def recommend(
         if place_ids
         else []
     )
-    place_cards = {card.id: card for card in await combined_ratings.place_cards(session, place_rows, now)}
+    place_cards = {card.id: card for card in await place_queries.cards(session, place_rows, now)}
     items = [
         Recommendation(
             type="area" if item.target_type is InterestTarget.AREA else "place",

@@ -128,6 +128,7 @@ export function PlaceListItem({
         <PlacePhoto
           src={place.cover_url}
           credit={place.cover_credit}
+          source={place.cover_source}
           layer={place.layer}
           slug={category?.slug}
           alt={place.title}

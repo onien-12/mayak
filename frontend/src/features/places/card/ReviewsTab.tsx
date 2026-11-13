@@ -2,7 +2,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { requireAuth, useAuth } from '@/features/auth';
-import { errorMessage, placesApi, queryKeys, type PlaceDetail, type Review } from '@/shared/api';
+import {
+  errorMessage,
+  placesApi,
+  queryKeys,
+  rereadAfterCheck,
+  type PlaceDetail,
+  type Review,
+} from '@/shared/api';
 import { formatRating, pluralize, PLURALS } from '@/shared/lib/format';
 import { shownRating } from '@/shared/lib/rating';
 import {
@@ -32,6 +39,7 @@ function ReviewForm({ place, mine }: { place: PlaceDetail; mine: Review | undefi
       void queryClient.invalidateQueries({ queryKey: queryKeys.places.reviews(place.id) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.places.detail(place.id) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.places.lists });
+      rereadAfterCheck([queryKeys.places.reviews(place.id), queryKeys.places.detail(place.id)]);
     },
     onError: (error) => toast.error(errorMessage(error)),
   });

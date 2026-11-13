@@ -251,7 +251,8 @@ async def test_stats(world: World, client: AsyncClient) -> None:
     assert len(stats["issues_by_stage"]) == 5
     assert {item["name"] for item in stats["top_categories"]} == {"Туалет", "Культура", "Дороги и транспорт"}
     assert len(stats["activity"]) == 30
-    assert stats["activity"][-1] == {"date": "2026-11-11", "places": 4, "votes": 2}
+    # The newcomer's place was not checked (no model) and waits for a moderator: not counted yet.
+    assert stats["activity"][-1] == {"date": "2026-11-11", "places": 3, "votes": 2}
     assert stats["activity"][0]["date"] == "2026-10-13"
     assert stats["top_contributors"][0]["username"] == "expert"
 

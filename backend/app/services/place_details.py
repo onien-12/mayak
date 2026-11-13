@@ -5,8 +5,9 @@ from datetime import datetime
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domain import hold_reasons
 from app.domain import interests as interest_rules
-from app.domain.enums import AiTarget, Layer, PlaceStatus, VoteKind
+from app.domain.enums import AiTarget, HoldState, Layer, PlaceStatus, VoteKind
 from app.domain.interests import InterestTarget, Topic
 from app.models import Comment, EventParticipant, Favorite, OutageBuilding, Photo, Place, Review, User, Vote
 from app.schemas.catalog import CategoryOut
@@ -14,8 +15,8 @@ from app.schemas.place import (
     IssueDetail,
     MyVote,
     OutageBuildingOut,
-    PhotoOut,
     PlaceDetail,
+    ScreeningHold,
     VerificationSummary,
 )
 from app.schemas.user import UserBrief
@@ -104,6 +105,14 @@ async def _own_held_comments(session: AsyncSession, place: Place, viewer: User |
     return count or 0
 
 
+async def _screening_hold(session: AsyncSession, place: Place) -> ScreeningHold | None:
+    """Why the place did not pass the automatic check, while it waits for a moderator."""
+    hold = await quiet_holds.find_active(session, AiTarget.PLACE, place.id)
+    if hold is None or hold.state is not HoldState.HELD:
+        return None
+    return ScreeningHold(reasons=hold_reasons.for_author(hold.reasons, AiTarget.PLACE))
+
+
 async def _cover_seen(
     session: AsyncSession, place: Place, photos: list[Photo], viewer: User | None
 ) -> tuple[str | None, dict[str, str] | None]:
@@ -118,8 +127,9 @@ async def _cover_seen(
 async def build(session: AsyncSession, place: Place, viewer: User | None, now: datetime) -> PlaceDetail:
     """Requires `place` loaded with category, author, event and issue.
 
-    The author of a quietly held place sees it exactly as published (SPEC §24.1): the status
-    they would have, their held photos, comments and review counted; moderators see the truth.
+    During the screening window the author sees the place as published (SPEC §24.1); once it
+    is held they see it `pending` with the reasons. Their own photos, comments and review in
+    a hold stay visible and counted for them; moderators see the truth.
     """
     is_author = viewer is not None and viewer.id == place.author_id
     is_staff = viewer is not None and viewer.is_staff
@@ -156,8 +166,11 @@ async def build(session: AsyncSession, place: Place, viewer: User | None, now: d
         event = mappers.event_detail(place.event, now, is_joined=is_joined, sees_contact=sees_contact)
 
     base = mappers.place_base_fields(place, now, await combined_ratings.for_place(session, place), status)
+    borrowed = (await covers.borrowed_for_places(session, [place])).get(place.id)
     base.update(
-        cover_url=cover_url, cover_credit=cover_credit, rating_avg=rating_avg, rating_count=rating_count
+        **mappers.cover_fields(cover_url, cover_credit, borrowed),
+        rating_avg=rating_avg,
+        rating_count=rating_count,
     )
     return PlaceDetail(
         **base,
@@ -166,7 +179,7 @@ async def build(session: AsyncSession, place: Place, viewer: User | None, now: d
         tips=place.tips,
         attributes=place.attributes,
         category=CategoryOut.model_validate(place.category),
-        photos=[PhotoOut.model_validate(photo) for photo in photos],
+        photos=await uploads.photos_out(session, photos, viewer),
         author=UserBrief.model_validate(place.author),
         updated_at=place.updated_at,
         verification=await _verification(session, place, viewer),
@@ -175,6 +188,7 @@ async def build(session: AsyncSession, place: Place, viewer: User | None, now: d
         can_edit=can_edit(place, viewer),
         can_appeal=is_author and standing.can_appeal,
         moderation_note=standing.note if is_privileged else None,
+        screening_hold=await _screening_hold(session, place) if is_privileged else None,
         object_id=place.object_id,
         external_rating=await external_ratings.cached(session, place.object_id),
         comments_count=place.comments_count + await _own_held_comments(session, place, viewer),

@@ -1,6 +1,13 @@
 import type { Layer } from '@/shared/api';
 import { LAYER_META, LAYERS } from '@/shared/lib/labels';
 
+/** Places closer than this on the screen merge into one count bubble. */
+export const CLUSTER_RADIUS_PX = 64;
+/** From this zoom on, places are drawn one by one. */
+export const UNCLUSTER_ZOOM = 17;
+/** Draw order of pins and count bubbles: above note bubbles (20), below «Для вас» and the selection. */
+export const PLACE_Z_INDEX = 30;
+
 /** Conic gradient showing the share of each layer inside a cluster. */
 function layerRing(layers: readonly Layer[]): string {
   const total = layers.length || 1;
@@ -42,6 +49,7 @@ export function clusterStyle(count: number, layers: readonly Layer[]) {
     type: 'html' as const,
     html: bubble(size, String(count), layers),
     anchor: [size / 2, size / 2],
+    zIndex: PLACE_Z_INDEX,
     preventMapInteractions: false,
   };
 }

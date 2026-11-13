@@ -11,7 +11,6 @@ import { Banner, Button, Chip, Field, Input, PanelLayout, Textarea } from '@/sha
 
 import { ROUTE_PLURALS } from '../lib/plurals';
 import { serverErrors, toRouteInput, validateDraft, visibleCount } from './model';
-import { RouteKindPicker } from './RouteSettings';
 import { useBuilderStore } from './store';
 import type { RoutePreviewState } from './useRoutePreview';
 import { VisibilityPicker } from './VisibilityPicker';
@@ -56,7 +55,10 @@ interface DetailsStepProps {
   onSaved: (route: RouteDetail) => void;
 }
 
-/** Step 2 «О маршруте»: name, kind, difficulty, story, tips, tags and who sees it. */
+/**
+ * Step 2 «О маршруте»: name, difficulty, story, tips, tags and who sees it. How the route is
+ * travelled is chosen once, on the first step, where the line is built for it.
+ */
 export function DetailsStep({ title, routeId, preview, onSaved }: DetailsStepProps) {
   const queryClient = useQueryClient();
   const { permissions } = useAuth();
@@ -152,10 +154,6 @@ export function DetailsStep({ title, routeId, preview, onSaved }: DetailsStepPro
             placeholder="Например: Сопки Русского за полдня"
             onChange={(event) => setMeta({ title: event.target.value })}
           />
-        </Field>
-
-        <Field label="Как пойдём">
-          <RouteKindPicker />
         </Field>
 
         <Field label="Сложность" hint={difficultyHint}>

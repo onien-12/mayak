@@ -44,3 +44,20 @@ class ExternalLink(Base):
     place_id: Mapped[int | None] = mapped_column(ForeignKey("places.id", ondelete="CASCADE"), index=True)
     area_id: Mapped[int | None] = mapped_column(ForeignKey("areas.id", ondelete="CASCADE"), index=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime)
+
+
+class AppliedSnapshot(Base):
+    """Which version of a committed enrichment snapshot this database has received (SPEC §19).
+
+    The application applies a new snapshot once at start-up; afterwards the data is the
+    community's to change — a deleted archive photo is not brought back on the next restart.
+    """
+
+    __tablename__ = "applied_snapshots"
+    __table_args__ = (UniqueConstraint("name"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(40))
+    version: Mapped[str] = mapped_column(String(64))
+    """A digest of the snapshot file as committed."""
+    applied_at: Mapped[datetime] = mapped_column(UTCDateTime)

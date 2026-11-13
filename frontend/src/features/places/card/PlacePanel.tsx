@@ -39,6 +39,7 @@ import { IssueSection } from './IssueSection';
 import { PlaceActions } from './PlaceActions';
 import { PlaceGallery } from './PlaceGallery';
 import { PlaceTabs } from './PlaceTabs';
+import { PinLegend } from './PinLegend';
 import { StatusBanners } from './StatusBanners';
 import { TrustBlock } from './TrustBlock';
 import { usePlace } from './usePlace';
@@ -118,6 +119,8 @@ function PlaceBody({ place }: { place: PlaceDetail }) {
           )}
           <TopicChips topics={place.topics} label="О чём это место" className="mt-1" />
         </div>
+
+        <PinLegend place={place} />
 
         <StatusBanners place={place} onAppeal={() => setAppealing(true)} />
         {place.layer === 'event' && <EventSection place={place} />}

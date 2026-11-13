@@ -11,9 +11,9 @@ import { haversine } from '@/shared/lib/geo';
 import { VOTE_KINDS, voteMeta } from '@/shared/lib/labels';
 import { isUnconfirmedImport } from '@/shared/lib/imports';
 import { TONES } from '@/shared/lib/tones';
-import { Button, Field, Pop, PRESS_SCALE, Textarea, TWEEN } from '@/shared/ui';
+import { AnimatedNumber, Button, Field, Pop, PRESS_SCALE, Textarea, TWEEN } from '@/shared/ui';
 
-import { useVote } from './usePlace';
+import { useVote, useWithdrawVote } from './usePlace';
 
 const NEARBY_M = 300;
 /** «Требует уточнения» is only useful with words: the moderator has to know what to check. */
@@ -27,14 +27,16 @@ const VOTABLE: readonly PlaceDetail['status'][] = [
 
 /**
  * Collective verification: «Присутствует / Отсутствует / Требует уточнения» (issues:
- * «Проблема есть / Устранено / Ситуация изменилась»). One tap votes; voting again replaces
- * the previous vote. «Требует уточнения» first asks what exactly is wrong — the text goes to the
- * moderators with the vote.
+ * «Проблема есть / Устранено / Ситуация изменилась»). Each button shows how many residents
+ * chose it. One tap votes; another answer replaces the vote, a tap on the chosen one takes it
+ * back. «Требует уточнения» first asks what exactly is wrong — the text goes to the moderators
+ * with the vote.
  */
 export function VerificationBlock({ place }: { place: PlaceDetail }) {
   const { user } = useAuth();
   const { location } = useUserLocation();
   const vote = useVote(place.id);
+  const withdraw = useWithdrawVote(place.id);
   const [comment, setComment] = useState('');
   const [commenting, setCommenting] = useState(false);
   const [clarifying, setClarifying] = useState(false);
@@ -50,6 +52,11 @@ export function VerificationBlock({ place }: { place: PlaceDetail }) {
 
   const cast = (kind: VoteKind) =>
     requireAuth(() => {
+      if (place.verification.my_vote?.kind === kind) {
+        withdraw.mutate();
+        setClarifying(false);
+        return;
+      }
       if (kind === 'unclear') {
         setClarifying(true);
         return;
@@ -92,6 +99,7 @@ export function VerificationBlock({ place }: { place: PlaceDetail }) {
               whileTap={{ scale: PRESS_SCALE }}
               transition={TWEEN.fast}
               onClick={() => cast(kind)}
+              aria-label={`${label}: ${place.verification[kind]}`}
               className={cn(
                 'flex min-h-[76px] flex-col items-center justify-center gap-1.5 rounded-card border px-1.5 py-2.5 text-center text-xs leading-tight font-medium transition-colors duration-150',
                 'disabled:cursor-not-allowed disabled:opacity-45',
@@ -100,9 +108,17 @@ export function VerificationBlock({ place }: { place: PlaceDetail }) {
                   : 'border-line bg-surface text-ink hover:border-ink-faint/60',
               )}
             >
-              <Pop trigger={selected}>
-                <Icon size={22} aria-hidden className={selected ? undefined : TONES[tone].text} />
-              </Pop>
+              <span
+                className={cn(
+                  'flex items-center gap-1.5 text-lg leading-none font-semibold',
+                  selected ? undefined : TONES[tone].text,
+                )}
+              >
+                <Pop trigger={selected}>
+                  <Icon size={20} aria-hidden />
+                </Pop>
+                <AnimatedNumber value={place.verification[kind]} />
+              </span>
               {label}
             </motion.button>
           );
@@ -155,7 +171,15 @@ export function VerificationBlock({ place }: { place: PlaceDetail }) {
       {myVote && (
         <p className="mt-2 text-sm text-ink-soft">
           Вы отметили: <span className="font-medium text-ink">{meta[myVote.kind].done}</span> ·{' '}
-          {formatRelative(myVote.created_at)}. Можно изменить.
+          {formatRelative(myVote.created_at)}.{' '}
+          <button
+            type="button"
+            onClick={() => withdraw.mutate()}
+            disabled={withdraw.isPending}
+            className="font-medium text-brand underline-offset-2 hover:underline"
+          >
+            Отменить голос
+          </button>
         </p>
       )}
 

@@ -45,3 +45,18 @@ def test_a_name_made_only_of_kinds_is_a_weak_signal() -> None:
 def test_same_name_ignores_spelling() -> None:
     assert names.same_name("Приморский океанариум", "приморский  Океанариум")
     assert not names.same_name("Смотровая Нагорного парка", "Нагорный парк")
+
+
+@pytest.mark.parametrize(
+    ("whole", "name", "expected"),
+    [
+        ("Нагорный парк", "Нагорный парк", True),
+        ("Нагорный парк", "Нагорный парк культуры", True),
+        ("Нагорный парк", "Смотровая площадка Нагорного парка", False),
+        ("Спортивная набережная", "Набережная Спортивной гавани", True),
+        ("Миллионка", "Исторический квартал Миллионка", True),
+        ("Миллионка", "Ресторан Миллионка", False),
+    ],
+)
+def test_a_name_of_the_whole_is_not_a_name_of_its_part(whole: str, name: str, expected: bool) -> None:
+    assert names.names_the_whole(whole, name) is expected

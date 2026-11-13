@@ -1,0 +1,113 @@
+{
+ "meta": {
+  "api_version": "3.0.22097",
+  "code": 200,
+  "issue_date": "20261113"
+ },
+ "result": {
+  "items": [
+   {
+    "external_content": [],
+    "full_name": "Владивосток, Покровский парк",
+    "id": "3519124403650895",
+    "name": "Покровский парк",
+    "point": {
+     "lat": 43.125317,
+     "lon": 131.891867
+    },
+    "reviews": {
+     "general_rating": 5,
+     "general_review_count": 2,
+     "general_review_count_with_stars": 10,
+     "items": [
+      {
+       "is_reviewable": true,
+       "tag": "2gis_reviews"
+      }
+     ]
+    },
+    "subtype": "place",
+    "type": "adm_div"
+   },
+   {
+    "address_name": "улица Академика Касьянова, 25",
+    "building_name": "Приморский океанариум",
+    "external_content": [
+     {
+      "count": 6157,
+      "main_photo_url": "https://i8.photo.2gis.com/main/branch/25/70000001024450259/common",
+      "subtype": "common",
+      "type": "photo_album"
+     }
+    ],
+    "full_name": "Русский, Приморский океанариум",
+    "id": "70000001024450259",
+    "name": "Приморский океанариум, экспозиционный корпус",
+    "point": {
+     "lat": 43.01417,
+     "lon": 131.930253
+    },
+    "purpose_name": "Научное учреждение",
+    "reviews": {
+     "general_rating": 5,
+     "general_review_count": 3877,
+     "general_review_count_with_stars": 13966,
+     "is_reviewable": true,
+     "is_reviewable_on_flamp": true,
+     "items": [
+      {
+       "is_reviewable": true,
+       "tag": "2gis_reviews"
+      },
+      {
+       "is_reviewable": true,
+       "rating": 4,
+       "recommendation_count": 1,
+       "review_count": 29,
+       "tag": "flamp"
+      }
+     ],
+     "org_rating": 4.7,
+     "org_review_count": 4251,
+     "org_review_count_with_stars": 15259,
+     "rating": 4,
+     "recommendation_count": 1,
+     "review_count": 29
+    },
+    "type": "branch"
+   },
+   {
+    "external_content": [
+     {
+      "count": 319,
+      "main_photo_url": "https://i8.photo.2gis.com/main/geo/25/70030076460363066/view",
+      "subtype": "view",
+      "type": "photo_album"
+     }
+    ],
+    "full_name": "Владивосток, Смотровая площадка Нагорного парка",
+    "id": "70030076460363066",
+    "name": "Смотровая площадка Нагорного парка",
+    "point": {
+     "lat": 43.116683,
+     "lon": 131.923285
+    },
+    "reviews": {
+     "general_rating": 5,
+     "general_review_count": 171,
+     "general_review_count_with_stars": 655,
+     "items": [
+      {
+       "is_reviewable": true,
+       "tag": "2gis_reviews"
+      }
+     ]
+    },
+    "subtype": "viewing_point",
+    "subtype_name": "смотровая площадка",
+    "type": "attraction"
+   }
+  ],
+  "total": 3
+ }
+}

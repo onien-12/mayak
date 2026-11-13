@@ -14,7 +14,8 @@ interface ExternalPhotosProps {
   className?: string;
 }
 
-function SourceCredit({ photo, className }: { photo: ViewerPhoto; className: string }) {
+/** «Фото: Яндекс Карты» on a hot-linked photo, linked to the object's page at the service. */
+export function SourceCredit({ photo, className }: { photo: ViewerPhoto; className: string }) {
   if (!photo.source) return null;
   return (
     <a
@@ -33,7 +34,8 @@ function SourceCredit({ photo, className }: { photo: ViewerPhoto; className: str
 
 /**
  * The sources' own photos as a fallback for a card without any photos of ours. Hot-linked
- * (never stored, never a list cover), always credited; a tap opens the viewer.
+ * (never stored; a list shows the first as a borrowed cover), always credited; a tap opens the
+ * viewer.
  */
 export function ExternalPhotos({ photos, alt, variant, className }: ExternalPhotosProps) {
   const [index, setIndex] = useState<number | null>(null);

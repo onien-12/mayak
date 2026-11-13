@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import ContentFlaggedError, FieldValidationError
-from app.domain import content_check, geo, gibberish
+from app.domain import content_check, geo, gibberish, hold_reasons
 from app.domain.enums import Layer, PlaceStatus
 from app.domain.limits import DAY
 from app.models import EventDetails, Place
@@ -19,9 +19,9 @@ MASHED_ADDRESS_HINT = (
 
 
 def gibberish_reasons(texts: Mapping[str, str | None]) -> list[str]:
-    """Keyboard mashing in any of the labelled texts holds the item quietly (SPEC §24.1)."""
+    """Keyboard mashing in any of the labelled texts holds the item (SPEC §24.1)."""
     return [
-        f"Похоже на случайный набор букв: {label}"
+        hold_reasons.GIBBERISH.format(label=label)
         for label, text in texts.items()
         if gibberish.is_gibberish(text)
     ]
@@ -29,7 +29,7 @@ def gibberish_reasons(texts: Mapping[str, str | None]) -> list[str]:
 
 def ensure_sane_address(address: str | None, texts: Mapping[str, str | None]) -> None:
     """Only a mashed address is said openly (422 on `address`); when the texts are mashed too,
-    the publication is held quietly instead."""
+    the publication is held instead (and its author told why)."""
     if gibberish.address_is_mashed(address) and not gibberish_reasons(texts):
         raise FieldValidationError("address", MASHED_ADDRESS_HINT)
 

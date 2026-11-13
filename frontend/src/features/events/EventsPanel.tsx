@@ -59,8 +59,8 @@ function CreateActions() {
 }
 
 /**
- * «Афиша». Imported VL.ru events, residents' events and meetups in one feed; the map shows
- * the same filtered set. Phones: search and period chips float over the map, other filters
+ * «События». Residents' own events and meetups come first — that is the default view; the
+ * imported city listings (VL.ru) are one filter away. The map shows the same filtered set. Phones: search and period chips float over the map, other filters
  * live in their own sheet. Desktop: everything in the side panel.
  */
 export default function EventsPanel() {
@@ -105,8 +105,8 @@ export default function EventsPanel() {
 
   return (
     <PanelLayout
-      title="Афиша"
-      subtitle="События города и встречи жителей"
+      title="События"
+      subtitle="Встречи и события, которые устраивают жители"
       actions={
         <>
           {feed.isRefreshing && <Spinner size={16} className="mr-1" />}

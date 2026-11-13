@@ -17,6 +17,7 @@ export {
   usePlaceParam,
   type MapActions,
 } from './hooks';
+export { CLUSTER_RADIUS_PX, UNCLUSTER_ZOOM } from './cluster';
 export { MapCircle } from './MapCircle';
 export { MapDragHandle } from './MapDragHandle';
 export { useMap } from './mapContext';

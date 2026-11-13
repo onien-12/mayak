@@ -52,7 +52,10 @@ export function PanelLayout({
           <IconButton icon={ArrowLeft} label={backLabel} onClick={onBack} className="-ml-2" />
         )}
         <div className="min-w-0 flex-1">
-          <h1 className="truncate font-display text-lg font-semibold text-ink">{title}</h1>
+          {/* A long name wraps to a second line; only a third one is cut. */}
+          <h1 className="line-clamp-2 font-display text-lg leading-tight font-semibold wrap-anywhere text-ink">
+            {title}
+          </h1>
           {subtitle && <p className="truncate text-sm text-ink-soft">{subtitle}</p>}
         </div>
         {actions && <div className="-mr-2 flex shrink-0 items-center gap-0.5">{actions}</div>}

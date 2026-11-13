@@ -158,7 +158,7 @@ export function StopRow({
         </button>
         <IconButton
           icon={X}
-          label={via ? 'Удалить точку трека' : 'Удалить точку'}
+          label={via ? 'Удалить промежуточную точку' : 'Удалить точку'}
           size="md"
           onClick={onRemove}
         />

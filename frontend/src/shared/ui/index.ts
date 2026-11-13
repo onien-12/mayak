@@ -30,6 +30,7 @@ export { LogoMark } from './LogoMark';
 export { MapTopBar } from './MapTopBar';
 export { Modal } from './Modal';
 export { ModalSurface } from './ModalSurface';
+export { OnReviewMark } from './OnReviewMark';
 export {
   EASE_OUT,
   fadeVariants,
@@ -62,7 +63,7 @@ export { Textarea, type TextareaProps } from './Textarea';
 export { TextCreditNote } from './TextCreditNote';
 export { Toaster } from './Toaster';
 export { OsmCredit } from './OsmCredit';
-export { CreditMark, PhotoCreditLink } from './PhotoCredit';
+export { CreditMark, PhotoCreditLink, CoverSourceMark } from './PhotoCredit';
 export { ACTION_TOAST_TTL_MS, toast } from './toastStore';
 export { useTopBarSlots } from './topBarSlots';
 export { Tooltip } from './Tooltip';

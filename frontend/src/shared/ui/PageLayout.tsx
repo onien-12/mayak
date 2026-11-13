@@ -48,7 +48,7 @@ export function PageLayout({
             <IconButton icon={ArrowLeft} label="Назад" onClick={onBack} className="-ml-2" />
           )}
           <div className="min-w-0 flex-1">
-            <h1 className="truncate font-display text-xl font-semibold text-ink lg:text-2xl">
+            <h1 className="line-clamp-2 font-display text-xl leading-tight font-semibold wrap-anywhere text-ink lg:text-2xl">
               {title}
             </h1>
             {subtitle && <p className="mt-0.5 truncate text-sm text-ink-soft">{subtitle}</p>}

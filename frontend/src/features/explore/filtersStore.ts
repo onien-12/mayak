@@ -14,9 +14,11 @@ export interface ExploreFilters {
   attrs: Record<string, string>;
   includeResolved: boolean;
   includePast: boolean;
+  /** Draw the bare OpenStreetMap background objects (yard playgrounds, lone monuments) too. */
+  includeUnnamed: boolean;
 }
 
-type FlagKey = 'free' | 'accessible' | 'includeResolved' | 'includePast';
+type FlagKey = 'free' | 'accessible' | 'includeResolved' | 'includePast' | 'includeUnnamed';
 
 interface ExploreState extends ExploreFilters {
   /** Search text — kept across navigation, not across reloads. */
@@ -41,6 +43,7 @@ const DEFAULTS: ExploreFilters = {
   attrs: {},
   includeResolved: false,
   includePast: false,
+  includeUnnamed: false,
 };
 
 const toggle = <T>(list: readonly T[], item: T): T[] =>
@@ -83,6 +86,7 @@ export function countActiveFilters(filters: ExploreFilters): number {
     Number(filters.accessible) +
     Number(filters.includeResolved) +
     Number(filters.includePast) +
+    Number(filters.includeUnnamed) +
     Number(filters.minStatus !== 'any') +
     (LAYERS.length - filters.layers.length)
   );

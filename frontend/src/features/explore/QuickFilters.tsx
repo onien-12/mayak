@@ -1,4 +1,4 @@
-import { Accessibility, CalendarCheck, CircleCheck, Wallet } from 'lucide-react';
+import { Accessibility, CalendarCheck, CircleCheck, Shapes, Wallet } from 'lucide-react';
 
 import type { Category, FieldDef, Layer } from '@/shared/api';
 import { Chip, Select } from '@/shared/ui';
@@ -45,12 +45,16 @@ function AttributeFilter({ field }: { field: FieldDef }) {
   return null;
 }
 
-/** «Бесплатно», «Доступная среда», archive toggles and attribute filters of the chosen category. */
+/**
+ * «Бесплатно», «Доступная среда», archive toggles, the nameless background objects and attribute
+ * filters of the chosen category.
+ */
 export function QuickFilters({ layers, category }: QuickFiltersProps) {
   const free = useExploreFilters((state) => state.free);
   const accessible = useExploreFilters((state) => state.accessible);
   const includePast = useExploreFilters((state) => state.includePast);
   const includeResolved = useExploreFilters((state) => state.includeResolved);
+  const includeUnnamed = useExploreFilters((state) => state.includeUnnamed);
   const toggleFlag = useExploreFilters((state) => state.toggleFlag);
 
   const fields = (category?.fields ?? []).filter(
@@ -88,6 +92,16 @@ export function QuickFilters({ layers, category }: QuickFiltersProps) {
           onClick={() => toggleFlag('includeResolved')}
         >
           Решённые проблемы
+        </Chip>
+      )}
+      {(layers.includes('infrastructure') || layers.includes('tourism')) && (
+        <Chip
+          icon={Shapes}
+          tone="infrastructure"
+          selected={includeUnnamed}
+          onClick={() => toggleFlag('includeUnnamed')}
+        >
+          Всё из OpenStreetMap
         </Chip>
       )}
       {fields.map((field) => (

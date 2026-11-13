@@ -18,8 +18,8 @@ const KIND_OPTIONS: readonly { value: EventKind; label: string }[] = [
 ];
 
 const ORIGIN_OPTIONS: readonly { value: EventOrigin; label: string }[] = [
-  { value: 'all', label: 'Все' },
   { value: 'community', label: 'От жителей' },
+  { value: 'all', label: 'Все' },
   { value: 'external', label: 'Афиша VL.ru' },
 ];
 
@@ -125,7 +125,9 @@ export const EventsFilters = memo(function EventsFilters() {
           size="sm"
           value={filters.sort}
           onChange={filters.setSort}
-          options={SORT_OPTIONS}
+          options={
+            filters.free ? SORT_OPTIONS.filter((option) => option.value !== 'price') : SORT_OPTIONS
+          }
         />
       </Group>
     </div>

@@ -17,6 +17,7 @@ from app.domain import cover as cover_rules
 from app.domain import geometry, levels
 from app.domain import interests as interest_rules
 from app.domain.areas import CountedPlace
+from app.domain.cover import CatalogueCover
 from app.domain.enums import PUBLIC_STATUSES, AreaKind, IssueStage, Layer, UserLevel
 from app.domain.geo import BBox
 from app.domain.geometry import Territory
@@ -75,7 +76,10 @@ def personal_interest(
 
 
 def _card_fields(
-    area: Area, combined_rating: CombinedRating | None, personal: PersonalInterest | None
+    area: Area,
+    combined_rating: CombinedRating | None,
+    personal: PersonalInterest | None,
+    borrowed_cover: CatalogueCover | None = None,
 ) -> dict[str, object]:
     return {
         "id": area.id,
@@ -85,8 +89,7 @@ def _card_fields(
         "lat": area.lat,
         "lng": area.lng,
         "radius_m": area.radius_m,
-        "cover_url": area.cover_url,
-        "cover_credit": area.cover_credit,
+        **mappers.cover_fields(area.cover_url, area.cover_credit, borrowed_cover),
         "places_count": area.places_count,
         "interest": area.interest,
         "rating_avg": area.rating_avg,
@@ -363,8 +366,10 @@ async def list_areas(
 
 
 async def area_cards(session: AsyncSession, rows: Sequence[Area], profile: Profile | None) -> list[AreaCard]:
-    """Cards for a page of areas: blends and, with a profile, the personal interest in two queries."""
+    """Cards for a page of areas: blends, borrowed covers and, with a profile, the personal
+    interest, each loaded for the whole page."""
     blends = await combined_ratings.for_areas(session, rows)
+    borrowed = await covers.borrowed_for_areas(session, rows)
     tags = (
         await interest_tags.for_targets(
             session, InterestTarget.AREA, [area.id for area in rows], profile.keys()
@@ -374,7 +379,12 @@ async def area_cards(session: AsyncSession, rows: Sequence[Area], profile: Profi
     )
     return [
         AreaCard(
-            **_card_fields(area, blends.get(area.id), personal_interest(area, profile, tags.get(area.id, {})))
+            **_card_fields(
+                area,
+                blends.get(area.id),
+                personal_interest(area, profile, tags.get(area.id, {})),
+                borrowed.get(area.id),
+            )
         )
         for area in rows
     ]
@@ -393,7 +403,7 @@ async def _build_detail(
     session: AsyncSession, area: Area, viewer: User | None, now: datetime, profile: Profile | None = None
 ) -> AreaDetail:
     """Everything public inside, all layers, best first; finished events and resolved issues are left out.
-    The viewer's own quietly held places are listed for them alone (SPEC §24.1)."""
+    The viewer's own places in a screening window are listed for them alone (SPEC §24.1)."""
     still_relevant = or_(
         Place.layer.not_in((Layer.EVENT, Layer.ISSUE)),
         (EventDetails.ends_at >= now) & EventDetails.is_cancelled.is_(False),
@@ -405,9 +415,12 @@ async def _build_detail(
         .order_by(Place.trust_score.desc(), Place.rating_avg.desc().nulls_last(), Place.id)
     )
     blends = await combined_ratings.for_areas(session, [area])
+    borrowed = await covers.borrowed_for_areas(session, [area])
     tags = await interest_tags.for_target(session, InterestTarget.AREA, area.id)
     return AreaDetail(
-        **_card_fields(area, blends.get(area.id), personal_interest(area, profile, tags)),
+        **_card_fields(
+            area, blends.get(area.id), personal_interest(area, profile, tags), borrowed.get(area.id)
+        ),
         description=area.description,
         description_credit=await text_credits.for_description(session, area),
         object_id=area.object_id,

@@ -43,7 +43,9 @@ async def _reported_ids(session: AsyncSession, viewer: User | None, note_ids: li
     return set(rows)
 
 
-def _note_out(note: MapNote, viewer: User | None, *, reported_by_me: bool) -> MapNoteOut:
+def _note_out(
+    note: MapNote, viewer: User | None, *, reported_by_me: bool, on_review: bool = False
+) -> MapNoteOut:
     return MapNoteOut(
         id=note.id,
         lat=note.lat,
@@ -55,6 +57,7 @@ def _note_out(note: MapNote, viewer: User | None, *, reported_by_me: bool) -> Ma
         created_at=note.created_at,
         can_delete=viewer is not None and (viewer.id == note.author_id or viewer.is_staff),
         reported_by_me=reported_by_me,
+        on_review=on_review,
     )
 
 
@@ -80,7 +83,12 @@ async def list_notes(
         ]
     notes = notes[:limit]
     reported = await _reported_ids(session, viewer, [note.id for note in notes])
-    return [_note_out(note, viewer, reported_by_me=note.id in reported) for note in notes]
+    own = [note.id for note in notes if viewer is not None and note.author_id == viewer.id]
+    held = await quiet_holds.held_ids(session, AiTarget.NOTE, own)
+    return [
+        _note_out(note, viewer, reported_by_me=note.id in reported, on_review=note.id in held)
+        for note in notes
+    ]
 
 
 async def _enforce_daily_limit(session: AsyncSession, author: User, now: datetime) -> None:

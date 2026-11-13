@@ -2,16 +2,20 @@
 
 import json
 from collections.abc import Sequence
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 import httpx
+from sqlalchemy import delete, select
 
 from app.core.clock import utcnow
 from app.core.http import USER_AGENT
 from app.domain import free_text
+from app.domain.archive_photos import Tie
 from app.domain.geo import parse_south_west_north_east
-from app.models import Area, Place
+from app.models import Area, Photo, Place
+from app.seed.runner import apply_wikimedia
 from app.services import areas, enrichment
 from app.services.wikimedia import apply, collector, parser, snapshot
 from app.services.wikimedia.client import WikimediaClient
@@ -44,6 +48,11 @@ def photo(file: str, lat: float | None = None, lng: float | None = None) -> Comm
         lat=lat,
         lng=lng,
     )
+
+
+def tied(file: str) -> CommonsPhoto:
+    """A photo found as the image of its object's Wikidata item."""
+    return replace(photo(file), tie=Tie.ITEM)
 
 
 def test_only_free_large_relevant_https_photos_survive() -> None:
@@ -129,23 +138,53 @@ def test_targets_are_matched_to_articles_by_name_and_distance() -> None:
     assert collector.match_article(park, articles) == articles[0], "an area reaches its radius plus a margin"
 
 
+def test_a_place_never_takes_the_article_of_the_location_it_lies_in() -> None:
+    park_article = Article("Нагорный парк", 43.1181, 131.9223)
+    park = Target("seed-area:nagorny", "Нагорный парк", 43.1180, 131.9225, is_area=True, radius_m=300)
+    viewpoint = Target("seed:nagorny_view", "Смотровая Нагорного парка", 43.1167, 131.9233)
+    assert collector.match_article(viewpoint, [park_article]) == park_article, "names alone are similar"
+    assert collector.match_article(viewpoint, [park_article], [park]) is None, "but it is the container"
+    own = Article("Смотровая площадка Нагорного парка", 43.1167, 131.9232)
+    assert collector.match_article(viewpoint, [park_article, own], [park]) == own
+
+    # A place named as its location is that location's own object and keeps its article.
+    same = Target("seed:pokrovsky", "Покровский парк", 43.1243, 131.8925)
+    pokrovsky = Target("seed-area:p", "Покровский парк", 43.1240, 131.8920, is_area=True, radius_m=250)
+    article = Article("Покровский парк", 43.1241, 131.8922)
+    assert collector.match_article(same, [article], [pokrovsky]) == article
+    assert collector.match_article(park, [park_article], [park]) == park_article, "areas are unaffected"
+
+
 def test_a_photo_belongs_to_its_nearest_target_and_linked_photos_come_first() -> None:
-    lighthouse = Target("osm:node/1", "Маяк", *LIGHTHOUSE, wikidata="Q1")
-    plaque = Target("osm:node/2", "Табличка", LIGHTHOUSE[0] + 0.001, LIGHTHOUSE[1])
-    cape = Target("osm:way/3", "Мыс", LIGHTHOUSE[0] + 0.0005, LIGHTHOUSE[1], is_area=True)
-    near_lighthouse = photo("File:A.jpg", *LIGHTHOUSE)
-    near_plaque = photo("File:B.jpg", LIGHTHOUSE[0] + 0.001, LIGHTHOUSE[1])
-    linked = photo("File:Linked.jpg")
+    lighthouse = Target("osm:node/1", "Токаревский маяк", *LIGHTHOUSE, wikidata="Q1")
+    plaque = Target("osm:node/2", "Табличка Токаревского маяка", LIGHTHOUSE[0] + 0.001, LIGHTHOUSE[1])
+    cape = Target("osm:way/3", "Мыс Эгершельд", LIGHTHOUSE[0] + 0.0005, LIGHTHOUSE[1], is_area=True)
+    near_lighthouse = photo("File:Tokarevsky lighthouse, Egersheld.jpg", *LIGHTHOUSE)
+    near_plaque = photo("File:Табличка у Токаревского маяка.jpg", LIGHTHOUSE[0] + 0.001, LIGHTHOUSE[1])
+    bird = photo("File:Emberiza spodocephala.jpg", *LIGHTHOUSE)
+    linked = replace(photo("File:Linked.jpg"), tie=Tie.ITEM)
     nearby = {
-        "osm:node/1": [near_plaque, near_lighthouse, linked],
+        "osm:node/1": [near_plaque, bird, near_lighthouse, linked],
         "osm:node/2": [near_lighthouse, near_plaque],
-        "osm:way/3": [near_lighthouse, *(photo(f"File:{index}.jpg", *LIGHTHOUSE) for index in range(9))],
+        "osm:way/3": [
+            near_lighthouse,
+            bird,
+            *(
+                photo(f"File:Egersheld {index}.jpg", *LIGHTHOUSE)
+                for index in range(collector.MAX_AREA_PHOTOS + 3)
+            ),
+        ],
     }
     result = collector.assign([lighthouse, plaque, cape], {"osm:node/1": [linked]}, nearby)
-    assert [item.file for item in result["osm:node/1"]] == ["File:Linked.jpg", "File:A.jpg"]
-    assert [item.file for item in result["osm:node/2"]] == ["File:B.jpg"]
+    assert [item.file for item in result["osm:node/1"]] == [
+        "File:Linked.jpg",
+        "File:Tokarevsky lighthouse, Egersheld.jpg",
+    ], "the bird nearby names nothing; the plaque's photo is nearer the plaque"
+    assert [item.tie for item in result["osm:node/1"]] == [Tie.ITEM, Tie.NEARBY]
+    assert [item.file for item in result["osm:node/2"]] == ["File:Табличка у Токаревского маяка.jpg"]
     assert len(result["osm:way/3"]) == collector.MAX_AREA_PHOTOS
-    assert result["osm:way/3"][0].file == "File:A.jpg", "areas are assigned independently of places"
+    assert result["osm:way/3"][0].file == "File:Tokarevsky lighthouse, Egersheld.jpg", "areas apart"
+    assert all(item.file != bird.file for item in result["osm:way/3"])
 
 
 class FakeSource:
@@ -185,7 +224,10 @@ class FakeSource:
 
     async def nearby(self, lat: float, lng: float, radius_m: int) -> list[CommonsPhoto]:
         self.calls.append(f"nearby:{radius_m}")
-        return [photo("File:Near.jpg", lat, lng)]
+        return [
+            photo("File:Emberiza spodocephala.jpg", lat, lng),
+            photo("File:Скульптура у моря.jpg", lat, lng),
+        ]
 
 
 async def test_collect_batches_every_step_and_searches_only_what_is_still_missing() -> None:
@@ -212,7 +254,10 @@ async def test_collect_batches_every_step_and_searches_only_what_is_still_missin
     assert [item.file for item in harvest.photos["seed:lighthouse"]] == ["File:Q9.jpg", "File:Lead.jpg"]
     assert [item.file for item in harvest.photos["osm:node/1"]] == ["File:Tagged.jpg", "File:Q1.jpg"]
     assert [item.file for item in harvest.photos["osm:way/2"]] == ["File:From category.jpg"]
-    assert [item.file for item in harvest.photos["osm:node/3"]] == ["File:Near.jpg"]
+    assert [item.file for item in harvest.photos["osm:node/3"]] == ["File:Скульптура у моря.jpg"]
+    assert "osm:node/4" not in harvest.photos, "«Скульптура рядом» is not named by either file"
+    assert [item.tie for item in harvest.photos["osm:node/1"]] == [Tie.NAMED, Tie.ITEM]
+    assert [item.tie for item in harvest.photos["osm:way/2"]] == [Tie.CATEGORY]
     assert "osm:node/5" not in harvest.photos
     assert harvest.summaries == {"seed:lighthouse": SUMMARY}
 
@@ -277,7 +322,10 @@ async def test_photos_and_texts_never_push_residents_aside(world: World, client:
         )
     ).json()
     harvest = Harvest(
-        photos={"sight": [photo("File:A.jpg"), photo("File:B.jpg")], "area": [photo("File:C.jpg")]},
+        photos={
+            "sight": [tied("File:A.jpg"), tied("File:B.jpg")],
+            "area": [tied("File:C.jpg"), photo("File:Emberiza spodocephala.jpg")],
+        },
         summaries={"sight": SUMMARY, "told": SUMMARY, "area": SUMMARY},
     )
 
@@ -340,3 +388,76 @@ async def test_photos_and_texts_never_push_residents_aside(world: World, client:
         "areas_photographed": 0,
         "descriptions_added": 0,
     }, "idempotent"
+
+
+async def test_the_committed_snapshot_is_applied_once_per_version(world: World, tmp_path: Path) -> None:
+    author = await world.actor("author", reputation=20)
+    sight = await world.create_place(author, "viewpoint", title="Видовая у маяка", description="")
+    async with world.session() as session:
+        (await session.get_one(Place, sight["id"])).external_id = "osm:node/1"
+        await session.commit()
+    path = tmp_path / "wikimedia_snapshot.json"
+
+    async def start() -> apply.WikimediaReport | None:
+        async with world.session() as session:
+            report = await apply_wikimedia(session, utcnow(), path=path)
+            await session.commit()
+        return report
+
+    async def photos() -> list[str]:
+        async with world.session() as session:
+            return list(await session.scalars(select(Photo.url).where(Photo.place_id == sight["id"])))
+
+    assert await start() is None, "no snapshot, nothing to apply"
+    snapshot.write(path, Harvest(photos={"osm:node/1": [tied("File:A.jpg")]}), utcnow())
+    first = await start()
+    assert first is not None
+    assert first.places_photographed == 1
+    assert await photos() == ["https://upload.wikimedia.org/File:A.jpg"]
+
+    async with world.session() as session:
+        await session.execute(delete(Photo).where(Photo.place_id == sight["id"]))
+        await session.commit()
+    assert await start() is None, "the same version is not applied again"
+    assert await photos() == [], "a removed archive photo stays removed"
+
+    snapshot.write(path, Harvest(photos={"osm:node/1": [tied("File:B.jpg")]}), utcnow())
+    assert (await start()) is not None, "a new version is applied at the next start"
+    assert await photos() == ["https://upload.wikimedia.org/File:B.jpg"]
+
+
+def test_description_categories_and_tie_survive_the_snapshot(tmp_path: Path) -> None:
+    page = {
+        "title": "File:IMG 1.jpg",
+        "imageinfo": [
+            {
+                "mime": "image/jpeg",
+                "width": 2000,
+                "height": 1500,
+                "thumburl": "https://upload.wikimedia.org/thumb/IMG_1.jpg",
+                "thumbwidth": 1280,
+                "thumbheight": 960,
+                "descriptionurl": "https://commons.wikimedia.org/wiki/File:IMG_1.jpg",
+                "extmetadata": {
+                    "Artist": {"value": "Автор"},
+                    "LicenseShortName": {"value": "CC BY-SA 4.0"},
+                    "ImageDescription": {"value": "<b>Токаревский маяк</b> на закате<script>x</script>"},
+                    "Categories": {"value": "Tokarevsky Lighthouse|Egersheld"},
+                },
+            }
+        ],
+    }
+    found = parser.photo_from_page(page)
+    assert found is not None
+    assert (found.description, found.categories) == (
+        "Токаревский маяк на закате",
+        ("Tokarevsky Lighthouse", "Egersheld"),
+    )
+    path = tmp_path / "snapshot.json"
+    snapshot.write(path, Harvest(photos={"osm:node/1": [replace(found, tie=Tie.NEARBY)]}), utcnow())
+    [back] = snapshot.read(path).photos["osm:node/1"]
+    assert (back.tie, back.description, back.categories) == (Tie.NEARBY, found.description, found.categories)
+    rows = json.loads(path.read_text(encoding="utf-8"))
+    rows["targets"]["osm:node/1"]["photos"][0]["tie"] = "trust-me"
+    path.write_text(json.dumps(rows), encoding="utf-8")
+    assert snapshot.read(path).photos["osm:node/1"][0].tie is None, "an unknown tie counts as none"

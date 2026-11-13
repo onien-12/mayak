@@ -10,10 +10,10 @@ from sqlalchemy.orm import contains_eager, joinedload
 
 from app.core import viewer as request_viewer
 from app.core.errors import NotFoundError
-from app.domain.enums import PUBLIC_STATUSES, AiTarget, PlaceStatus
+from app.domain.enums import ACTIVE_HOLD_STATES, PUBLIC_STATUSES, AiTarget, HoldState, PlaceStatus
 from app.models import Place, User
 from app.schemas.place import PlaceCard
-from app.services import combined_ratings, mappers, quiet_holds
+from app.services import combined_ratings, covers, mappers, quiet_holds
 
 
 class Origin(StrEnum):
@@ -50,8 +50,8 @@ def card_query() -> Select[tuple[Place]]:
 def listed_clause(
     viewer: User | None, statuses: Collection[PlaceStatus] = PUBLIC_STATUSES
 ) -> ColumnElement[bool]:
-    """Places a listing shows: those in `statuses`, plus the viewer's own quietly held places
-    that look to them as one of `statuses` (SPEC §24.1)."""
+    """Places a listing shows: those in `statuses`, plus the viewer's own places in a screening
+    window that look to them as one of `statuses` (SPEC §24.1)."""
     public = Place.status.in_(statuses)
     if viewer is None:
         return public
@@ -60,24 +60,45 @@ def listed_clause(
     )
 
 
-async def shown_statuses(session: AsyncSession, places: Sequence[Place]) -> dict[int, PlaceStatus]:
-    """What the authors of quietly held places among `places` see instead of `pending`."""
+async def _hold_statuses(
+    session: AsyncSession, places: Sequence[Place], states: Collection[HoldState]
+) -> dict[int, PlaceStatus]:
     pending = [place.id for place in places if place.status is PlaceStatus.PENDING]
-    holds = await quiet_holds.active_by_target(session, AiTarget.PLACE, pending)
+    holds = await quiet_holds.active_by_target(session, AiTarget.PLACE, pending, states)
     return {place_id: PlaceStatus(hold.shown_status) for place_id, hold in holds.items() if hold.shown_status}
 
 
+async def shown_statuses(session: AsyncSession, places: Sequence[Place]) -> dict[int, PlaceStatus]:
+    """What the authors of places in a screening window see instead of `pending` (SPEC §24.1).
+    A held place is `pending` for its author too."""
+    return await _hold_statuses(session, places, (HoldState.SCREENING,))
+
+
 async def shown_status(session: AsyncSession, place: Place) -> PlaceStatus:
+    """The status the place's author sees."""
     return (await shown_statuses(session, [place])).get(place.id, place.status)
 
 
+async def intended_status(session: AsyncSession, place: Place) -> PlaceStatus:
+    """The status the place gets back when its screening window or hold ends well: what the
+    publication rules gave it before the screening took it to `pending`."""
+    return (await _hold_statuses(session, [place], ACTIVE_HOLD_STATES)).get(place.id, place.status)
+
+
 async def cards(session: AsyncSession, places: Sequence[Place], now: datetime) -> list[PlaceCard]:
-    """`mappers.place_card` for a page of places: blends in one go, and the status a held
-    place's author sees; moderators get the real one."""
+    """`mappers.place_card` for a page of places: blends and borrowed covers in one go, and the
+    status the author of a place in its screening window sees; moderators get the real one."""
     blends = await combined_ratings.for_places(session, places)
+    borrowed = await covers.borrowed_for_places(session, places)
     shown = {} if request_viewer.is_staff() else await shown_statuses(session, places)
     return [
-        mappers.place_card(place, now, combined_rating=blends.get(place.id), status=shown.get(place.id))
+        mappers.place_card(
+            place,
+            now,
+            combined_rating=blends.get(place.id),
+            status=shown.get(place.id),
+            borrowed_cover=borrowed.get(place.id),
+        )
         for place in places
     ]
 

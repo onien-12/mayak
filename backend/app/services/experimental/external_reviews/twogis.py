@@ -6,6 +6,15 @@ Up to 30 reviews come with one request; a map object's further reviews can be pa
 (the organisations' address has no paging parameter verified yet). Review authors, replies and
 profiles are discarded here.
 
+Photos come with the answers the lookup reads anyway (verified 2026-11-13): the catalogue answer
+names the main photo of the object's album when asked for `items.external_content` (the same
+request, one more field), and the reviews answer carries the photos visitors attached to their
+reviews. Both are hot-linked. The project's paid Places key does not hand out that field. A
+search answer leaves the album out for some map objects although the object has one (the Nagorny
+Park viewpoint); only when a match has no photo from either answer is the object itself asked for
+its album — one further request, and a refusal or an unreadable answer there costs the lookup
+nothing but that photo.
+
 The catalogue holds organisations (`branch`) and map objects — bridges, squares, embankments,
 hills (`building`, `adm_div`, `attraction`). Organisations are searched first; when none is ours,
 map objects are searched. Their reviews live at another address of the same service. When the
@@ -16,6 +25,7 @@ can win over the restaurant of the same name.
 from __future__ import annotations
 
 import json
+import logging
 import re
 import time
 from dataclasses import dataclass, field, replace
@@ -49,7 +59,12 @@ PAGE_SIZE = 50
 SEARCH_RESULTS = 20
 # The public web client's catalogue request checksum, from its rM/48442 modules.
 REQUEST_SEED = "baf4c54e9dae"
+CATALOGUE_FIELDS = "items.point,items.reviews,items.external_content"
+PHOTO_SIZE = "1920x"
+"""Of the answer's `preview_urls` (64x64, 320x, 640x, 1920x): sharp in the viewer."""
+_PHOTO_URL = re.compile(r"https://[a-z0-9-]+(?:\.photo)?\.2gis\.com/[^\s\"'<>]{1,500}\Z")
 _ID = re.compile(r"[0-9]{1,32}\Z")
+logger = logging.getLogger(__name__)
 _SEARCH_ID = re.compile(r"([0-9]{1,32})(?:_[a-zA-Z0-9_-]+)?\Z")
 
 
@@ -83,7 +98,7 @@ def request_checksum(path: str, params: dict[str, str]) -> str:
 
 def catalogue_url(config: WebConfig, target: Target, *, geo: bool = False) -> str:
     """By the bound ID when there is one; otherwise a search for organisations or map objects."""
-    params = {"key": config.catalogue_key, "fields": "items.point,items.reviews", "locale": "ru_RU"}
+    params = {"key": config.catalogue_key, "fields": CATALOGUE_FIELDS, "locale": "ru_RU"}
     if target.object_id:
         if not _ID.fullmatch(target.object_id):
             raise UnexpectedPageError("invalid 2GIS object ID")
@@ -100,6 +115,33 @@ def catalogue_url(config: WebConfig, target: Target, *, geo: bool = False) -> st
         )
     params["r"] = request_checksum("/3.0/" + endpoint, params)
     return CATALOGUE_URL + endpoint + "?" + urlencode(params)
+
+
+def album_url(config: WebConfig, org_id: str) -> str:
+    """The matched object by its ID, asked only for its album."""
+    if not _ID.fullmatch(org_id):
+        raise UnexpectedPageError("invalid 2GIS object ID")
+    params = {
+        "key": config.catalogue_key,
+        "fields": "items.external_content",
+        "locale": "ru_RU",
+        "id": org_id,
+    }
+    params["r"] = request_checksum("/3.0/items/byid", params)
+    return CATALOGUE_URL + "items/byid?" + urlencode(params)
+
+
+def parse_album(text: str, org_id: str) -> tuple[str, ...]:
+    """The main photo of the object's album from an `items/byid` answer; () when it has none."""
+    payload = _payload(text)
+    result = payload.get("result")
+    items = result.get("items") if isinstance(result, dict) else None
+    for item in items if isinstance(items, list) else ():
+        identifier = item.get("id") if isinstance(item, dict) else None
+        match = _SEARCH_ID.fullmatch(identifier) if isinstance(identifier, str) else None
+        if match is not None and match.group(1) == org_id:
+            return _album_photo(item)
+    return ()
 
 
 def _payload(text: str) -> dict[str, Any]:
@@ -178,15 +220,46 @@ def parse_catalogue(text: str, *, geo: bool = False) -> list[Organization]:
                 value if value is not None and 0 < value <= 5 else None,
                 parser._count(rating.get("general_review_count_with_stars")),
                 parser._count(rating.get("general_review_count")),
-                (),
+                _album_photo(item),
                 kind,
             )
         )
     return found
 
 
-def _page(text: str, org_id: str, *, geo: bool, offset: int) -> tuple[dict[str, Any], ReviewPage]:
-    """The validated metadata and the reviews of one answer of a reviews address."""
+def _album_photo(item: dict[str, Any]) -> tuple[str, ...]:
+    """The main photo of the object's own album in a catalogue item, when it has one."""
+    content = item.get("external_content")
+    for entry in content if isinstance(content, list) else ():
+        if isinstance(entry, dict) and entry.get("type") == "photo_album":
+            url = entry.get("main_photo_url")
+            if isinstance(url, str) and _PHOTO_URL.match(url):
+                return (url,)
+    return ()
+
+
+def _review_photos(raw: dict[str, Any]) -> list[str]:
+    """The visible, processed photos a visitor attached to one shown review (map objects' reviews
+    call the list `media`; their shape there is unverified, and anything else is ignored)."""
+    photos = raw.get("photos") or raw.get("media")
+    urls = []
+    for photo in photos if isinstance(photos, list) else ():
+        if not isinstance(photo, dict) or photo.get("visibility_status", "visible") != "visible":
+            continue
+        if photo.get("processing_status", "finished") != "finished":
+            continue
+        sizes = photo.get("preview_urls")
+        url = sizes.get(PHOTO_SIZE) or sizes.get("url") if isinstance(sizes, dict) else None
+        if isinstance(url, str) and _PHOTO_URL.match(url):
+            urls.append(url)
+    return urls
+
+
+def _page(
+    text: str, org_id: str, *, geo: bool, offset: int
+) -> tuple[dict[str, Any], ReviewPage, tuple[str, ...]]:
+    """The validated metadata, the reviews and the photos of the shown reviews of one answer of a
+    reviews address."""
     payload = _payload(text)
     meta, raw_reviews = payload["meta"], payload.get("reviews")
     subject = "geo" if geo else "branch"
@@ -199,6 +272,7 @@ def _page(text: str, org_id: str, *, geo: bool, offset: int) -> tuple[dict[str, 
     if not raw_reviews and total > offset:
         raise UnexpectedPageError("inconsistent 2GIS review count")
     reviews: list[Review] = []
+    photos: list[str] = []
     seen = set()
     for raw in raw_reviews:
         if not isinstance(raw, dict) or not isinstance(raw.get("object"), dict):
@@ -216,6 +290,7 @@ def _page(text: str, org_id: str, *, geo: bool, offset: int) -> tuple[dict[str, 
         if not text or key in seen:
             continue
         seen.add(key)
+        photos.extend(_review_photos(raw))
         rating = parser._count(raw.get("rating"))
         reviews.append(
             Review(
@@ -226,17 +301,19 @@ def _page(text: str, org_id: str, *, geo: bool, offset: int) -> tuple[dict[str, 
         )
     end = offset + len(raw_reviews)
     # Only map objects page (`reviews_url`); an answer that brings nothing ends the paging.
-    return meta, ReviewPage(reviews, end if geo and raw_reviews and end < total else None)
+    page = ReviewPage(reviews, end if geo and raw_reviews and end < total else None)
+    return meta, page, tuple(dict.fromkeys(photos))[: parser.MAX_PHOTOS]
 
 
 def parse_reviews(text: str, organization: Organization, *, geo: bool = False) -> FetchedReviews:
-    meta, page = _page(text, organization.org_id, geo=geo, offset=0)
+    meta, page, photos = _page(text, organization.org_id, geo=geo, offset=0)
     subject = "geo" if geo else "branch"
     value = parser._number(meta.get(f"{subject}_rating"))
     organization = replace(
         organization,
         rating=value if value is not None and 0 < value <= 5 else None,
         reviews_count=parser._count(meta.get(f"{subject}_reviews_count")),
+        photos=tuple(dict.fromkeys((*organization.photos, *photos)))[: parser.MAX_PHOTOS],
     )
     return FetchedReviews(
         organization,
@@ -254,7 +331,8 @@ def parse_review_page(text: str, org_id: str, offset: int) -> ReviewPage:
 class TwoGisProvider:
     name: SourceName = "2gis"
     label = "2ГИС"
-    max_requests = 4
+    max_requests = 5
+    """The public keys, two searches, the reviews and, for a match without photos, its album."""
     pages = True
     max_page_requests = 2
     """The public keys, when no longer cached, and the page."""
@@ -278,11 +356,25 @@ class TwoGisProvider:
                 return Lookup(verdict)
             geo = found.kind in GEO_KINDS
             answer = await get(reviews_url(config, found.org_id, geo=geo))
-            return Lookup(verdict, parse_reviews(answer, found, geo=geo))
+            fetched = parse_reviews(answer, found, geo=geo)
+            if not fetched.organization.photos:
+                fetched = await self._with_album(config, fetched, get)
+            return Lookup(verdict, fetched)
         except (client.SourceUnavailableError, UnexpectedPageError):
             # A later permitted attempt must rediscover keys; never loop on rejected credentials.
             self._config = None
             raise
+
+    @staticmethod
+    async def _with_album(config: WebConfig, fetched: FetchedReviews, get: GetPage) -> FetchedReviews:
+        """The match's album photo by one more request; without it when the source refuses."""
+        org_id = fetched.organization.org_id
+        try:
+            photos = parse_album(await get(album_url(config, org_id)), org_id)
+        except (client.SourceUnavailableError, UnexpectedPageError) as error:
+            logger.warning("2GIS album of %s not available: %s", org_id, error)
+            return fetched
+        return replace(fetched, organization=replace(fetched.organization, photos=photos))
 
     async def next_page(self, org_id: str, offset: int, get: GetPage) -> ReviewPage:
         """`PAGE_SIZE` more reviews of a map object from `offset`, in one request while the public

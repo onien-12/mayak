@@ -32,7 +32,7 @@ export function InterestsDialog({
   onSkip,
   skipLabel = 'Пропустить',
   saving = false,
-  description = 'Отметьте, что вам по душе, — покажем это первым на карте и в афише. Изменить можно в профиле.',
+  description = 'Отметьте, что вам по душе, — покажем это первым на карте и в событиях. Изменить можно в профиле.',
 }: InterestsDialogProps) {
   const [selected, setSelected] = useState<TopicSlug[]>(() => [...initial]);
 

@@ -32,7 +32,7 @@ export function EventsSearch({ pill = false, onFocus }: EventsSearchProps) {
         onChange={(event) => setSearch(event.target.value)}
         onFocus={onFocus}
         placeholder="Концерт, встреча, площадка"
-        aria-label="Поиск по афише"
+        aria-label="Поиск по событиям"
         className={cn(
           '[&::-webkit-search-cancel-button]:hidden',
           pill && 'rounded-full border-line/70 shadow-card glass',

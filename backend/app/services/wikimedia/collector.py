@@ -15,10 +15,11 @@ Few, batched requests instead of one per target:
 
 import math
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Protocol
 
-from app.domain import geo, names
+from app.domain import archive_photos, geo, names
+from app.domain.archive_photos import Tie
 from app.domain.geo import BBox
 from app.services.wikimedia import parser
 from app.services.wikimedia.parser import Article, CommonsPhoto, Entity, Page
@@ -32,8 +33,10 @@ MAX_AREA_SEARCH_RADIUS_M = 1000
 SHARED_SEARCH_M = 60.0
 """Places this close to an already searched one reuse its search instead of asking again."""
 MAX_SEARCHES = 150
-MAX_PLACE_PHOTOS = 3
-MAX_AREA_PHOTOS = 4
+MAX_PLACE_PHOTOS = 8
+MAX_AREA_PHOTOS = 12
+"""Room for every linked file and the nearest geotagged ones; the searches return up to twenty
+files each, so a larger cap costs no further request."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,14 +103,37 @@ def _tolerance(target: Target) -> float:
     return target.radius_m + AREA_ARTICLE_MARGIN_M if target.is_area else PLACE_ARTICLE_TOLERANCE_M
 
 
-def match_article(target: Target, articles: Sequence[Article]) -> Article | None:
-    """The nearest similarly named article within reach of the target."""
+def _covers(area: Target, place: Target) -> bool:
+    return geo.haversine_m(area.lat, area.lng, place.lat, place.lng) <= area.radius_m
+
+
+def describes_container(target: Target, article: Article, areas: Sequence[Target]) -> bool:
+    """The article is about a location the place lies in, not about the place: «Нагорный парк»
+    for «Смотровая Нагорного парка». Its photos and text show the whole, so the place takes
+    neither. A place named as its location («Покровский парк» in the park of that name) is that
+    location's own object and keeps it."""
+    if target.is_area or names.same_name(target.title, article.title):
+        return False
+    return any(
+        _covers(area, target)
+        and names.names_the_whole(area.title, article.title)
+        and not names.same_name(target.title, area.title)
+        for area in areas
+    )
+
+
+def match_article(
+    target: Target, articles: Sequence[Article], areas: Sequence[Target] = ()
+) -> Article | None:
+    """The nearest similarly named article within reach of the target, never one about a
+    location (`areas`) the place lies in."""
     near = [
         (distance, article.title, article)
         for article in articles
         if (distance := geo.haversine_m(target.lat, target.lng, article.lat, article.lng))
         <= _tolerance(target)
         and names.similar_names(target.title, article.title)
+        and not describes_container(target, article, areas)
     ]
     return min(near)[2] if near else None
 
@@ -125,7 +151,9 @@ def assign(
 ) -> dict[str, list[CommonsPhoto]]:
     """Linked photos first, then nearby files each owned by its nearest target; capped per target.
 
-    Places and areas are assigned independently: a park may show the photo of a monument in it.
+    A nearby file is kept only when its title, description or categories name the target
+    (`archive_photos`): merely nearby, it shows whatever stood in front of the camera. Places and
+    areas are assigned independently: a park may show the photo of a monument in it.
     """
     by_key = {target.key: target for target in targets}
     taken = {photo.file for photos in linked.values() for photo in photos}
@@ -141,16 +169,20 @@ def assign(
     for target in targets:
         own_nearby = sorted(
             (
-                photo
+                replace(photo, tie=Tie.NEARBY)
                 for photo in nearby.get(target.key, ())
-                if photo.file not in taken and owners.get((target.is_area, photo.file)) == target.key
+                if photo.file not in taken
+                and owners.get((target.is_area, photo.file)) == target.key
+                and archive_photos.names_the_object(target.title, photo.texts())
             ),
             key=lambda photo: _distance(target, photo),
         )
-        chosen = list(dict.fromkeys([*linked.get(target.key, ()), *own_nearby]))
+        chosen: dict[str, CommonsPhoto] = {}
+        for photo in [*linked.get(target.key, ()), *own_nearby]:
+            chosen.setdefault(photo.file, photo)
         limit = MAX_AREA_PHOTOS if target.is_area else MAX_PLACE_PHOTOS
         if chosen:
-            result[target.key] = chosen[:limit]
+            result[target.key] = list(chosen.values())[:limit]
     return result
 
 
@@ -166,11 +198,21 @@ class _Links:
         page = self.pages.get(self.articles.get(target.key, ""))
         return target.wikidata or (page.wikidata if page else None)
 
-    def files_of(self, target: Target) -> list[str]:
+    def files_of(self, target: Target) -> dict[str, Tie]:
+        """The files tied to the target, each with how: named by its source, its item's image,
+        its article's lead image — in that order."""
         entity = self.entities.get(self.wikidata_of(target) or "")
         page = self.pages.get(self.articles.get(target.key, ""))
-        named = [*target.files, entity.image if entity else None, page.image if page else None]
-        return list(dict.fromkeys(file for file in named if file))
+        named = [
+            *((file, Tie.NAMED) for file in target.files),
+            (entity.image if entity else None, Tie.ITEM),
+            (page.image if page else None, Tie.ARTICLE),
+        ]
+        found: dict[str, Tie] = {}
+        for file, tie in named:
+            if file and file not in found:
+                found[file] = tie
+        return found
 
     def category_of(self, target: Target) -> str | None:
         entity = self.entities.get(self.wikidata_of(target) or "")
@@ -185,11 +227,12 @@ async def _links(source: Source, targets: Sequence[Target], centers: Sequence[tu
         for article in await source.articles_near(lat, lng, ARTICLE_SEARCH_RADIUS_M)
     }
     links.entities = await source.entities(sorted({target.wikidata for target in targets if target.wikidata}))
+    areas = [target for target in targets if target.is_area]
     for target in targets:
         entity = links.entities.get(target.wikidata or "")
         found = entity.article if entity and entity.article else None
         if found is None and target.wikidata is None:
-            article = match_article(target, list(articles.values()))
+            article = match_article(target, list(articles.values()), areas)
             found = article.title if article else None
         if found is not None:
             links.articles[target.key] = found
@@ -249,11 +292,14 @@ async def collect(
     wanted = {target.key: links.files_of(target) for target in targets}
     titles = sorted({title for files in wanted.values() for title in files})
     found = {photo.file: photo for photo in await source.files(titles)} if titles else {}
-    linked = {key: [found[title] for title in files if title in found] for key, files in wanted.items()}
+    linked = {
+        key: [replace(found[title], tie=tie) for title, tie in files.items() if title in found]
+        for key, files in wanted.items()
+    }
     have_photos = {key for key, photos in linked.items() if photos}
     by_category, nearby = await _searched(source, targets, links, have_photos, max_searches)
     for key, photos in by_category.items():
-        linked[key] = [*linked.get(key, ()), *photos]
+        linked[key] = [*linked.get(key, ()), *(replace(photo, tie=Tie.CATEGORY) for photo in photos)]
     harvest = Harvest(photos=assign(targets, linked, nearby))
     for target in targets:
         page = links.pages.get(links.articles.get(target.key, ""))

@@ -1,4 +1,4 @@
-"""Screening before anyone sees it (SPEC §24): quiet holds, hidden usefulness and author standing.
+"""Screening before anyone sees it (SPEC §24): holds, hidden usefulness and author standing.
 
 New tables only: an existing database gains them at start-up and nothing else changes.
 """
@@ -16,9 +16,10 @@ class QuietHold(Base):
     """One row per screened item: its window, its hold and how it ended.
 
     While `state` is screening or held the item is invisible to everyone but its author and
-    moderators; places and routes are kept `pending` for that and `shown_status` is what the
-    author keeps seeing. A photo screened together with its place or route names it as parent:
-    the parent's check decides for both.
+    moderators; places and routes are kept `pending` for that. During the screening window
+    `shown_status` is what the author sees; once held they see `pending` and the reasons. A photo
+    screened together with its place or route names it as parent: the parent's check decides for
+    both. The table name is historical: holds are no longer kept from their authors.
     """
 
     __tablename__ = "quiet_holds"
@@ -34,15 +35,17 @@ class QuietHold(Base):
     state: Mapped[HoldState] = mapped_column(enum_type(HoldState), index=True)
     source: Mapped[HoldSource | None] = mapped_column(enum_type(HoldSource))
     reasons: Mapped[list[str]] = mapped_column(JSON, default=list)
-    """Human-readable, for moderators only."""
+    """Human-readable lines for moderators; the author reads `hold_reasons.for_author` of them."""
     shown_status: Mapped[str | None] = mapped_column(String(32))
-    """Place or route status the author sees while the item is screened or held."""
+    """Place or route status the item gets back when released: what its author sees during the
+    screening window."""
     parent_type: Mapped[AiTarget | None] = mapped_column(enum_type(AiTarget))
     parent_id: Mapped[int | None]
     announce: Mapped[bool] = mapped_column(default=False)
     """A new place: tell territory subscribers once it is released."""
     penalized: Mapped[bool] = mapped_column(default=False)
-    """The author's standing lost points for this hold; a release returns them."""
+    """The author's standing lost points for this hold and the author was told; a release
+    returns the points."""
     revision: Mapped[int] = mapped_column(default=1)
     """Bumped by every new window, so a check of an older version never decides."""
     created_at: Mapped[datetime] = mapped_column(UTCDateTime)

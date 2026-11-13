@@ -101,6 +101,24 @@ export function useVote(placeId: number) {
   });
 }
 
+function predictWithdrawal(place: PlaceDetail): PlaceDetail {
+  const verification = { ...place.verification };
+  const previous = verification.my_vote?.kind;
+  if (previous) verification[previous] = Math.max(0, verification[previous] - 1);
+  verification.my_vote = null;
+  return { ...place, verification };
+}
+
+/** Takes the user's verification vote back. */
+export function useWithdrawVote(placeId: number) {
+  return useOptimisticPlaceMutation<void>({
+    placeId,
+    mutationFn: () => placesApi.withdrawVote(placeId),
+    predict: predictWithdrawal,
+    onSuccess: () => toast.success('Голос отменён'),
+  });
+}
+
 function predictParticipation(place: PlaceDetail, join: boolean): PlaceDetail {
   if (!place.event) return place;
   const delta = join ? 1 : -1;

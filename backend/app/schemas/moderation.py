@@ -42,7 +42,8 @@ class ModerationCaseOut(ApiModel):
     resolved_at: datetime | None
     ai_verdict: AiVerdict | None
     quiet: bool
-    """The target is quietly held (SPEC §24.1): its author does not know and sees it as published."""
+    """The target did not pass the screening and is held (SPEC §24.1): only its author and
+    moderators see it, and the author has been told why. The name is historical."""
     resolution: Resolution | None
 
 
@@ -75,7 +76,7 @@ class AiReviewOut(ApiModel):
 
 
 class QuietHoldOut(ApiModel):
-    """The screening window or quiet hold of a case target (SPEC §24.1); moderators only."""
+    """The screening window or hold of a case target (SPEC §24.1); moderators only."""
 
     state: HoldState
     source: HoldSource | None

@@ -5,7 +5,7 @@ import { Link, useLocation } from 'react-router';
 import { openAuthModal, useAuth } from '@/features/auth';
 import { NotificationBell } from '@/features/notifications';
 import { cn } from '@/shared/lib/cn';
-import { Avatar, IconButton, SPRING } from '@/shared/ui';
+import { Avatar, IconButton, SPRING, usePanelStore } from '@/shared/ui';
 
 import { RAIL_WIDTH } from './layout';
 import { Logo } from './Logo';
@@ -22,11 +22,14 @@ import { UserMenu } from './UserMenu';
 function RailLink({ item }: { item: NavItem }) {
   const { pathname } = useLocation();
   const active = isNavItemActive(item, pathname);
+  const reveal = usePanelStore((state) => state.reveal);
   const Icon = item.icon;
 
   return (
     <Link
       to={item.to}
+      // A section is asked for — its panel comes back even if it was folded away.
+      onClick={reveal}
       aria-current={active ? 'page' : undefined}
       className={cn(
         'group relative flex w-full flex-col items-center gap-1 py-2 text-2xs font-medium transition-colors duration-150',

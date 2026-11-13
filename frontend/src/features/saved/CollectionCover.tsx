@@ -68,6 +68,7 @@ export function CollectionCover({
           key={place.id}
           src={place.cover_url}
           credit={place.cover_credit}
+          source={place.cover_source}
           layer={place.layer}
           slug={byId.get(place.category_id)?.slug}
           alt=""

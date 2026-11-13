@@ -301,6 +301,30 @@ export interface Photo {
   height: number;
   /** Set for a freely licensed external photo (Wikimedia Commons); `null` = uploaded by a user. */
   credit: PhotoCredit | null;
+  /**
+   * The viewer's own photo that did not pass the automatic check (SPEC §24.1): only they and
+   * moderators see it until a moderator decides. Absent on an older backend.
+   */
+  on_review?: boolean;
+}
+
+/**
+ * The publication did not pass the automatic check and waits for a moderator (SPEC §24.1).
+ * Only for its author and moderators; reasons are plain lines such as «Текст: бессмыслица»,
+ * «Фото 2: не про место», never the model's numbers.
+ */
+export interface ScreeningHold {
+  reasons: string[];
+}
+
+/**
+ * The map service a hot-linked cover is borrowed from (SPEC §20, §25): shown on the cover as
+ * «Фото: Яндекс Карты» linking to the object's page there.
+ */
+export interface CoverSource {
+  source: string;
+  label: string;
+  url: string;
 }
 
 /** Author and licence of an external photo — must be shown with the photo. */
@@ -443,6 +467,8 @@ export interface PlaceCard {
   tags: string[];
   /** Set when the cover is a freely licensed external photo — show it on the cover. */
   cover_credit: PhotoCredit | null;
+  /** Set when the cover is borrowed from a map service's photos — show its mark on the cover. */
+  cover_source?: CoverSource | null;
   rating_avg: number | null;
   rating_count: number;
   /** `null`/absent → show `rating_avg`. */
@@ -494,6 +520,8 @@ export interface AreaCard {
   radius_m: number;
   cover_url: string | null;
   cover_credit: PhotoCredit | null;
+  /** Set when the cover is borrowed from a map service's photos — show its mark on the cover. */
+  cover_source?: CoverSource | null;
   /** Public infrastructure + tourism places inside. */
   places_count: number;
   /** 0..100 — how much there is to see and do. */
@@ -611,6 +639,8 @@ export interface PlaceDetail extends Omit<PlaceCard, 'event' | 'issue'> {
   can_appeal: boolean;
   /** Last moderator reason while pending/hidden/archived. */
   moderation_note: string | null;
+  /** Set while the place is `pending` because it did not pass the automatic check; author and staff only. */
+  screening_hold?: ScreeningHold | null;
   /** The 2GIS map object this place is, if linked. */
   object_id: string | null;
   /** Only for places linked to a 2GIS object (SPEC §19). */
@@ -639,6 +669,8 @@ export interface Review {
   rating: number;
   text: string;
   created_at: string;
+  /** The viewer's own review that did not pass the automatic check: only they and moderators see it. */
+  on_review?: boolean;
 }
 
 export interface Comment {
@@ -647,6 +679,8 @@ export interface Comment {
   text: string;
   created_at: string;
   can_delete: boolean;
+  /** The viewer's own comment that did not pass the automatic check: only they and moderators see it. */
+  on_review?: boolean;
 }
 
 export interface PlacesQuery {
@@ -955,6 +989,8 @@ export interface RouteDetail extends RouteCard {
   stops: RouteStop[];
   can_edit: boolean;
   my_rating: number | null;
+  /** Set while the route is `pending` because it did not pass the automatic check; author and staff only. */
+  screening_hold?: ScreeningHold | null;
 }
 
 export interface StopInput {
@@ -1040,6 +1076,8 @@ export interface MapNote {
   created_at: string;
   can_delete: boolean;
   reported_by_me: boolean;
+  /** The viewer's own note that did not pass the automatic check: only they and moderators see it. */
+  on_review?: boolean;
 }
 
 /** Exactly one selector: `bbox`, `object_id` or `near`. */
@@ -1143,7 +1181,10 @@ export interface ModerationCase {
   resolution: ModerationResolution | null;
   /** Latest LLM verdict, for the queue row (details: `ModerationCaseDetail.ai_review`). */
   ai_verdict: AiVerdict | null;
-  /** Quietly held (SPEC §24.1): the author does not know and sees the publication as published. */
+  /**
+   * Held by the automatic check (SPEC §24.1): only the author and moderators see it, and the
+   * author has been told it did not pass and why. The field name is historical.
+   */
   quiet: boolean;
 }
 
@@ -1188,7 +1229,7 @@ export interface ModerationCaseDetail extends ModerationCase {
   appeal_text: string | null;
   /** Empty for routes. */
   history: HistoryEntry[];
-  /** The screening window / quiet hold of the target, if it ever had one. */
+  /** The screening window / hold of the target, if it ever had one. */
   hold: QuietHold | null;
   /** Every screened photo of the target with its own check, held ones first. */
   photo_reviews: PhotoReview[];
@@ -1202,7 +1243,7 @@ export interface QuietHold {
   state: HoldState;
   source: HoldSource | null;
   reasons: string[];
-  /** What the author sees instead of the real status. */
+  /** The status the item gets back when released; its author sees it during the screening window. */
   shown_status: PlaceStatus | RouteStatus | null;
   created_at: string;
   updated_at: string;

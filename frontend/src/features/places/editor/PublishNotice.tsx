@@ -28,5 +28,10 @@ export function PublishNotice({ permissions }: { permissions: UserPermissions })
     );
   }
 
-  return <p className="text-xs text-ink-faint">Публикация сразу появится на карте. {limit}</p>;
+  return (
+    <p className="text-xs text-ink-faint">
+      Публикация появится на карте после автоматической проверки — обычно это несколько секунд.{' '}
+      {limit}
+    </p>
+  );
 }

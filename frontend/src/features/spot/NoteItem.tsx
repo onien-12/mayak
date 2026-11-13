@@ -4,7 +4,7 @@ import { motion } from 'motion/react';
 import type { MapNote } from '@/shared/api';
 import { cn } from '@/shared/lib/cn';
 import { formatRelative } from '@/shared/lib/format';
-import { IconButton, SPRING, TWEEN, UserChip } from '@/shared/ui';
+import { IconButton, OnReviewMark, SPRING, TWEEN, UserChip } from '@/shared/ui';
 
 interface NoteItemProps {
   note: MapNote;
@@ -62,6 +62,7 @@ export function NoteItem({ note, mine, onReport, onDelete }: NoteItemProps) {
       {note.reported_by_me && (
         <p className="mt-1.5 text-xs text-ink-faint">Вы пожаловались на эту заметку</p>
       )}
+      {note.on_review && <OnReviewMark className="mt-2" />}
     </motion.li>
   );
 }

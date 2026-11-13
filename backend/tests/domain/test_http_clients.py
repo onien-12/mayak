@@ -240,5 +240,8 @@ async def test_overpass_is_asked_once_and_failures_are_none() -> None:
 
 
 def test_descriptive_user_agent_has_no_personal_data() -> None:
-    assert USER_AGENT == "MayakCityMap/0.1 (hackathon project; city map of Vladivostok)"
+    """The contact Wikimedia asks for is the address of the site, never a person."""
+    assert USER_AGENT == (
+        "MayakCityMap/0.1 (https://mayak.ofdm.tech; city map of Vladivostok, hackathon project)"
+    )
     assert "@" not in USER_AGENT

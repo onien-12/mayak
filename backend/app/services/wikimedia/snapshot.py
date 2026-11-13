@@ -1,5 +1,6 @@
 """The committed Wikimedia snapshot: photos and short descriptions by target key (SPEC §19)."""
 
+import hashlib
 import json
 from datetime import datetime
 from pathlib import Path
@@ -25,6 +26,9 @@ def _photo_row(photo: CommonsPhoto) -> dict[str, Any]:
         "author": photo.author,
         "license": photo.license,
         "source_url": photo.source_url,
+        "tie": photo.tie,
+        "description": photo.description,
+        "categories": list(photo.categories),
     }
 
 
@@ -53,6 +57,9 @@ def _photo(raw: Any) -> CommonsPhoto | None:
         author=raw.get("author"),
         license_name=raw.get("license"),
         source_url=raw.get("source_url"),
+        description=raw.get("description", ""),
+        categories=raw.get("categories", ()),
+        tie=raw.get("tie"),
     )
 
 
@@ -65,6 +72,13 @@ def _summary(raw: Any) -> Summary | None:
     if not url.startswith(parser.WIKIPEDIA_URL.format(title="")):
         return None
     return Summary(parser.plain_text(text, free_text.MAX_SUMMARY_LENGTH), title, url)
+
+
+def version(path: Path) -> str | None:
+    """A digest of the committed file; None when there is no snapshot."""
+    if not path.exists():
+        return None
+    return hashlib.sha256(path.read_bytes()).hexdigest()[:16]
 
 
 def read(path: Path) -> Harvest:

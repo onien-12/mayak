@@ -66,6 +66,14 @@ REVIEW = {
     "on_moderation": False,
     "user": {"name": "Synthetic Private Author", "id": "private-user-id", "avatar": "private-avatar"},
     "official_answer": {"text": "Private reply"},
+    "photos": [
+        {
+            "id": "synthetic-photo",
+            "preview_urls": {"1920x": "https://cachizer3.2gis.com/reviews-photos/synthetic.jpg?w=1920"},
+            "processing_status": "finished",
+            "visibility_status": "visible",
+        }
+    ],
 }
 REVIEWS = {
     "meta": {"code": 200, "branch_rating": 4.9, "branch_reviews_count": 30, "total_count": 29},

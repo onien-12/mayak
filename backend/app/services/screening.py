@@ -1,16 +1,19 @@
-"""Quiet holds in motion (SPEC §24): releasing, holding and closing them.
+"""Holds of the screening in motion (SPEC §24): releasing, holding and closing them.
 
-The screener calls these after its checks, moderators through their decisions. Nothing here
-ever tells the author: a release makes the item appear for everyone else exactly as a normal
-publication would have, a hold simply leaves it where only the author and moderators see it.
+The screener calls these after its checks, moderators through their decisions. A release at the
+end of the screening window is silent: the item appears for everyone else exactly as a normal
+publication would have. A hold leaves the item where only the author and moderators see it and
+tells the author once that it did not pass and why, in words without the model's numbers.
 """
 
+from dataclasses import dataclass
 from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+from app.domain import hold_reasons
 from app.domain.enums import (
     ACTIVE_HOLD_STATES,
     PUBLIC_STATUSES,
@@ -19,6 +22,7 @@ from app.domain.enums import (
     HoldSource,
     HoldState,
     ModerationTrigger,
+    NotificationKind,
     PlaceStatus,
     RouteStatus,
     StandingReason,
@@ -43,6 +47,15 @@ from app.services.moderation_cases import CaseTarget
 _TITLE_LIMIT = 120
 _NOTE_TITLE = "Заметка на карте"
 REVIEW_HISTORY_MESSAGE = "Автоматическая проверка: публикацию посмотрит модератор"
+HOLD_HISTORY_MESSAGE = "Публикация отправлена на проверку автоматическим фильтром"
+
+
+@dataclass(frozen=True, slots=True)
+class Owner:
+    """What the author of an item recognises it by, and where it is shown."""
+
+    title: str | None
+    link: str | None
 
 
 def _title(prefix: str, title: str) -> str:
@@ -85,6 +98,33 @@ async def case_target(session: AsyncSession, hold: QuietHold) -> CaseTarget | No
     return CaseTarget(hold.target_type, hold.target_id, title, None, author)
 
 
+async def _owner_of(session: AsyncSession, place_id: int | None, route_id: int | None) -> Owner:
+    if place_id is not None:
+        return Owner(await _owner_title(session, place_id, None), notifications.place_link(place_id))
+    if route_id is not None:
+        return Owner(await _owner_title(session, None, route_id), notifications.route_link(route_id))
+    return Owner(None, None)
+
+
+async def owner(session: AsyncSession, hold: QuietHold) -> Owner | None:
+    """The place or route the item is (or is about), a note's 2GIS object; None when gone."""
+    if hold.target_type in (AiTarget.PLACE, AiTarget.ROUTE):
+        is_place = hold.target_type is AiTarget.PLACE
+        return await _owner_of(
+            session, hold.target_id if is_place else None, None if is_place else hold.target_id
+        )
+    item = await _small_item(session, hold)
+    if item is None:
+        return None
+    if isinstance(item, MapNote):
+        return Owner(item.object_name, notifications.spot_link(item.lat, item.lng, item.object_id))
+    route_id = item.route_id if isinstance(item, Review) else None
+    if isinstance(item, Photo) and item.route_stop_id is not None:
+        stop = await session.get(RouteStop, item.route_stop_id)
+        route_id = stop.route_id if stop is not None else None
+    return await _owner_of(session, item.place_id, route_id)
+
+
 async def _small_item(session: AsyncSession, hold: QuietHold) -> Comment | Review | MapNote | Photo | None:
     model = {
         AiTarget.COMMENT: Comment,
@@ -106,23 +146,79 @@ async def hold_item(
 ) -> None:
     """Keep the item where only its author and moderators see it and put it before a moderator.
 
-    The author's standing loses points once per hold, however many reasons it collects.
+    Once per hold, however many reasons it collects and however often it is checked again,
+    the author is told and their standing loses points. Occurrences of an event series held
+    with the item are held with it.
     """
     hold.state = HoldState.HELD
     hold.reasons = list(dict.fromkeys([*hold.reasons, *reasons]))
     hold.source = hold.source or source
     hold.updated_at = now
+    siblings = await _hold_siblings(session, hold, now)
     if not hold.penalized:
         hold.penalized = True
         await standing.change(
             session, hold.author_id, StandingReason.HELD, now=now, target=(hold.target_type, hold.target_id)
         )
+        await _tell_author(session, hold, now)
+        for held in (hold, *siblings):
+            await _record_place_hold(session, held, now)
     target = await case_target(session, hold)
     if target is not None:
         for trigger in dict.fromkeys(triggers or [ModerationTrigger.AUTO_AI]):
             await moderation_cases.open_case(session, target, trigger, now=now, flags=hold.reasons)
     if hold.target_type is AiTarget.PHOTO:
         await _refresh_photo_place(session, hold, now)
+
+
+async def _hold_siblings(session: AsyncSession, hold: QuietHold, now: datetime) -> list[QuietHold]:
+    """The other occurrences of an event series screened with the item: held for the same reasons."""
+    siblings = [
+        child
+        for child in await quiet_holds.children(session, hold)
+        if child.target_type is AiTarget.PLACE and child.state in ACTIVE_HOLD_STATES
+    ]
+    for sibling in siblings:
+        sibling.state = HoldState.HELD
+        sibling.reasons = list(hold.reasons)
+        sibling.source = hold.source
+        sibling.updated_at = now
+    return siblings
+
+
+async def _tell_author(session: AsyncSession, hold: QuietHold, now: datetime) -> None:
+    """One notice per hold: what did not pass, why, and that a moderator will decide."""
+    seen_by = await owner(session, hold)
+    if seen_by is None:
+        return
+    notifications.notify(
+        session,
+        user_id=hold.author_id,
+        kind=NotificationKind.MODERATION,
+        title=hold_reasons.notice_title(hold.target_type, seen_by.title),
+        body=hold_reasons.notice_body(hold.target_type, hold.reasons),
+        link=seen_by.link,
+        now=now,
+    )
+
+
+async def _record_place_hold(session: AsyncSession, hold: QuietHold, now: datetime) -> None:
+    """The place's history tells its author that it went to a moderator (SPEC §24.1)."""
+    if hold.target_type is not AiTarget.PLACE or not hold.shown_status:
+        return
+    seen = PlaceStatus(hold.shown_status)
+    place = await session.get(Place, hold.target_id)
+    if place is None or seen is PlaceStatus.PENDING:
+        return
+    history.record(
+        session,
+        place,
+        HistoryKind.STATUS_CHANGED,
+        HOLD_HISTORY_MESSAGE,
+        now=now,
+        old_status=seen,
+        new_status=PlaceStatus.PENDING,
+    )
 
 
 async def release(session: AsyncSession, hold: QuietHold, now: datetime, *, by_moderator: bool) -> None:

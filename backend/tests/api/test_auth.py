@@ -30,7 +30,7 @@ async def test_register_login_me(client: AsyncClient) -> None:
     assert (user["level"], user["role"], user["reputation"]) == ("newcomer", "user", 0)
     assert user["permissions"] == {
         "can_moderate": False,
-        "publishes_directly": False,
+        "publishes_directly": True,
         "can_respect": False,
         "daily_place_limit": 3,
         "places_left_today": 3,

@@ -8,22 +8,36 @@ from app.domain.enums import UserRole
 from tests.conftest import API, CENTER, World
 
 
-async def test_newcomer_place_is_premoderated(world: World, client: AsyncClient) -> None:
+async def test_newcomer_place_is_published_once_the_check_passes(world: World, client: AsyncClient) -> None:
     newcomer = await world.actor("newcomer")
     moderator = await world.actor("moderator", role=UserRole.MODERATOR)
+    world.enable_ai()
     place = await world.create_place(newcomer)
-    assert place["status"] == "pending"
-    assert place["can_edit"] is True
+    assert (place["status"], place["can_edit"]) == ("unverified", True)
+    await world.ai_done()
 
+    assert (await client.get(f"{API}/places/{place['id']}")).json()["status"] == "unverified"
+    assert [item["id"] for item in (await client.get(f"{API}/places")).json()] == [place["id"]]
+    assert (await moderator.get("/moderation/queue")).json() == []
+
+
+async def test_newcomer_place_goes_to_a_moderator_when_the_check_did_not_happen(
+    world: World, client: AsyncClient
+) -> None:
+    """No model answer: a newcomer's place is not shown on trust, as an established author's is."""
+    newcomer = await world.actor("newcomer")
+    resident = await world.actor("resident", reputation=15)
+    moderator = await world.actor("moderator", role=UserRole.MODERATOR)
+    place = await world.create_place(newcomer)
+    trusted = await world.create_place(resident)
+
+    assert (await newcomer.get(f"/places/{place['id']}")).json()["status"] == "pending"
     assert (await client.get(f"{API}/places/{place['id']}")).status_code == 404
-    assert (await client.get(f"{API}/places")).json() == []
-    assert [item["id"] for item in (await newcomer.get("/places")).json()] == [place["id"]]
+    assert [item["id"] for item in (await client.get(f"{API}/places")).json()] == [trusted["id"]]
     assert (await moderator.get(f"/places/{place['id']}")).status_code == 200
 
     queue = (await moderator.get("/moderation/queue")).json()
-    assert len(queue) == 1
-    assert queue[0]["target_id"] == place["id"]
-    assert queue[0]["triggers"] == ["premoderation"]
+    assert [(case["target_id"], case["triggers"]) for case in queue] == [(place["id"], ["auto_ai"])]
     assert queue[0]["author"]["level"] == "newcomer"
 
 

@@ -3,6 +3,8 @@ import { Check, Lightbulb, Minus } from 'lucide-react';
 import type { AttributeValue, FieldDef, PlaceDetail } from '@/shared/api';
 import { formatNumber } from '@/shared/lib/format';
 
+import { isRelevantFact } from '../attributeRules';
+
 function formatValue(field: FieldDef, value: AttributeValue): string {
   if (field.type === 'select') {
     return field.options?.find((option) => option.value === String(value))?.label ?? String(value);
@@ -20,7 +22,8 @@ function formatValue(field: FieldDef, value: AttributeValue): string {
 export function AttributesBlock({ place }: { place: PlaceDetail }) {
   const rows = place.category.fields.flatMap((field) => {
     const value = place.attributes[field.key];
-    return value === undefined || value === '' ? [] : [{ field, value }];
+    if (value === undefined || value === '') return [];
+    return isRelevantFact(field.key, place.attributes) ? [{ field, value }] : [];
   });
 
   if (rows.length === 0 && !place.tips && place.tags.length === 0) return null;

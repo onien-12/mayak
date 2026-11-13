@@ -23,6 +23,12 @@ def user_link(user_id: int) -> str:
     return f"/users/{user_id}"
 
 
+def spot_link(lat: float, lng: float, object_id: str | None) -> str:
+    """The map spot sheet of a point or a 2GIS object, where its notes are."""
+    link = f"/?at={lat:.6f},{lng:.6f}"
+    return f"{link}&obj={object_id}" if object_id else link
+
+
 def notify(
     session: AsyncSession,
     *,

@@ -6,7 +6,13 @@ import type { Layer } from '@/shared/api';
 import { fromLngLat } from '@/shared/lib/geo';
 import { useCategories } from '@/shared/hooks';
 
-import { clusterStyle, stackStyle } from './cluster';
+import {
+  CLUSTER_RADIUS_PX,
+  clusterStyle,
+  PLACE_Z_INDEX,
+  stackStyle,
+  UNCLUSTER_ZOOM,
+} from './cluster';
 import { PLACE_UNFOLD_ZOOM, usePlaceParam } from './hooks';
 import { useMap } from './mapContext';
 import { MapHtmlMarker } from './MapHtmlMarker';
@@ -17,8 +23,6 @@ import { groupSpots } from './spots';
 import { useStackParam } from './stack';
 import { useMapStore } from './store';
 
-const CLUSTER_RADIUS_PX = 64;
-const UNCLUSTER_ZOOM = 17;
 const SELECTED_Z_INDEX = 60;
 /** Above clusters and ordinary pins, below the selected one. */
 const RECOMMENDED_Z_INDEX = 55;
@@ -122,6 +126,7 @@ export function PlaceMarkers() {
             ...(alone
               ? { html: only.element, anchor: PIN_ANCHOR }
               : stackStyle(layers.length, layers, spot.lifted !== null)),
+            zIndex: PLACE_Z_INDEX,
             preventMapInteractions: false,
             userData: {
               placeIds: spot.rest.map((anchor) => anchor.id),

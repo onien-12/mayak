@@ -108,6 +108,18 @@ def awaits_judgement(outcome: Outcome, method: str, *, judged: bool) -> bool:
     return judged and outcome is Outcome.NO_MATCH and method == UNCONFIRMED
 
 
+def identity_holds(row: SourceRow | None, evidence: ReviewMatchEvidence | None, target: Target) -> bool:
+    """The stored answer was given for the target as it is now: its evidence belongs to that very
+    answer and to the target's current fingerprint (no rename, move, reparenting or rebinding)."""
+    return (
+        row is not None
+        and evidence is not None
+        and evidence.fingerprint == target.fingerprint
+        and evidence.fetched_at == row.fetched_at
+        and evidence.org_id == row.org_id
+    )
+
+
 def is_cached(
     row: SourceRow | None,
     evidence: ReviewMatchEvidence | None,
@@ -118,13 +130,7 @@ def is_cached(
 ) -> bool:
     """A match or a "no match" younger than a week, or a refused or failed lookup (or an
     unjudged "no match", see `awaits_judgement`) not yet due for a retry."""
-    if (
-        row is None
-        or evidence is None
-        or evidence.fingerprint != target.fingerprint
-        or evidence.fetched_at != row.fetched_at
-        or evidence.org_id != row.org_id
-    ):
+    if row is None or evidence is None or not identity_holds(row, evidence, target):
         return False
     if row.outcome in (Outcome.BLOCKED, Outcome.FAILED) or awaits_judgement(
         row.outcome, evidence.method, judged=judged
@@ -156,7 +162,7 @@ def _set_next_offset(row: SourceRow, next_offset: int | None) -> None:
 def _response(row: SourceRow | None, provider: Provider) -> ExternalReviews:
     if row is None or row.outcome is not Outcome.MATCHED or row.url is None:
         return NOTHING
-    if row.rating is None and not row.reviews:
+    if row.rating is None and not row.reviews and not row.photos:
         # Found, but with nothing to show; the link to the source is among `links` anyway.
         return NOTHING
     source = ExternalReviewSourceOut(

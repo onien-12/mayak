@@ -58,7 +58,7 @@ def test_author_prior_is_half_of_level_weight() -> None:
 @pytest.mark.parametrize(
     ("level", "role", "status", "daily"),
     [
-        (UserLevel.NEWCOMER, UserRole.USER, PlaceStatus.PENDING, 3),
+        (UserLevel.NEWCOMER, UserRole.USER, PlaceStatus.UNVERIFIED, 3),
         (UserLevel.RESIDENT, UserRole.USER, PlaceStatus.UNVERIFIED, 10),
         (UserLevel.TRUSTED, UserRole.USER, PlaceStatus.UNVERIFIED, 30),
         (UserLevel.EXPERT, UserRole.USER, PlaceStatus.PRELIMINARY, 100),
@@ -68,7 +68,13 @@ def test_author_prior_is_half_of_level_weight() -> None:
 def test_publishing_privileges(level: UserLevel, role: UserRole, status: PlaceStatus, daily: int) -> None:
     assert levels.initial_status(level, role) is status
     assert levels.daily_place_limit(level, role) == daily
-    assert levels.publishes_directly(level, role) is (status is not PlaceStatus.PENDING)
+    assert levels.publishes_directly(level, role) is True
+
+
+def test_only_a_newcomer_is_on_probation() -> None:
+    assert levels.is_on_probation(UserLevel.NEWCOMER, UserRole.USER) is True
+    assert levels.is_on_probation(UserLevel.RESIDENT, UserRole.USER) is False
+    assert levels.is_on_probation(UserLevel.NEWCOMER, UserRole.MODERATOR) is False
 
 
 def test_respects_require_resident_level() -> None:

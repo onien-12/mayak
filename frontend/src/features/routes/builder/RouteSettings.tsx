@@ -16,7 +16,7 @@ const PATH_MODES: { value: PathMode; label: string }[] = [
 const PATH_MODE_HINTS: Record<PathMode, string> = {
   roads: 'Линию строим по улицам, дорожкам и тропам из OpenStreetMap.',
   direct:
-    'Прямые отрезки между точками — для походов без дорог. Изгибы тропы задайте точками трека.',
+    'Прямые отрезки между точками — для походов без дорог. Изгибы тропы задайте дополнительными точками.',
 };
 
 /** How the route is travelled and how its line is built. */
@@ -87,7 +87,7 @@ export function PreviewSummary({ preview }: { preview: RoutePreviewState }) {
         <p className="flex gap-1.5 text-xs text-warning-ink">
           <CircleAlert size={14} aria-hidden className="mt-px shrink-0" />
           Не нашли здесь дорог и троп — показываем прямые отрезки. Для бездорожья включите
-          «Напрямую» и добавьте точки трека.
+          «Напрямую» и добавьте точки по пути.
         </p>
       )}
       {preview.failed && (

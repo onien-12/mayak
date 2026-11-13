@@ -1,6 +1,7 @@
 export { ComplaintDialog, type ComplaintDialogProps } from './card/ComplaintDialog';
 export { ElsewhereLinks } from './card/ElsewhereLinks';
 export { PlacePanel } from './card/PlacePanel';
+export { ScreeningHoldBanner } from './card/ScreeningHoldBanner';
 export { ExternalPhotos } from './external/ExternalPhotos';
 export { externalTarget } from './external/api';
 export { RatingSummary } from './external/RatingSummary';

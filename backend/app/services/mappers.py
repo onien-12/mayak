@@ -4,12 +4,14 @@ from datetime import datetime
 
 from app.domain import cover as cover_rules
 from app.domain import event_phase, trust
+from app.domain.cover import CatalogueCover
 from app.domain.enums import PUBLIC_STATUSES, ExternalSourceId, Layer, PlaceStatus, RouteStatus, StopKind
 from app.models import Area, Comment, EventDetails, IssueDetails, Place, Route, User
 from app.schemas.feedback import CommentOut
 from app.schemas.place import (
     AreaRef,
     CombinedRating,
+    CoverSource,
     EventBrief,
     EventDetail,
     ExternalSource,
@@ -26,6 +28,8 @@ EXTERNAL_SOURCE_LABELS: dict[ExternalSourceId, str] = {
     ExternalSourceId.OSM: "OpenStreetMap",
     ExternalSourceId.WIKIVOYAGE: "Викигид",
 }
+CATALOGUE_LABELS: dict[str, str] = {"yandex": "Яндекс Карты", "2gis": "2ГИС", "google": "Google Maps"}
+"""Names of the map services whose photos a cover may be borrowed from (SPEC §20, §25)."""
 
 
 def phase_of(event: EventDetails, now: datetime) -> event_phase.EventPhase:
@@ -107,10 +111,30 @@ def external_source(item: Place | Area) -> ExternalSource | None:
     )
 
 
-def place_base_fields(
-    place: Place, now: datetime, combined_rating: CombinedRating | None, status: PlaceStatus | None = None
+def cover_fields(
+    cover_url: str | None, cover_credit: dict[str, str] | None, borrowed: CatalogueCover | None
 ) -> dict[str, object]:
-    """`status` overrides the stored one: what the author of a quietly held place sees."""
+    """The cover as stored, or — only when there is none — the one borrowed from a map service,
+    marked with the service and linked to the object's page there (SPEC §25)."""
+    if cover_url is not None or borrowed is None:
+        return {"cover_url": cover_url, "cover_credit": cover_credit, "cover_source": None}
+    source = CoverSource(
+        source=borrowed.source,
+        label=CATALOGUE_LABELS.get(borrowed.source, borrowed.source),
+        url=borrowed.page_url,
+    )
+    return {"cover_url": borrowed.url, "cover_credit": None, "cover_source": source}
+
+
+def place_base_fields(
+    place: Place,
+    now: datetime,
+    combined_rating: CombinedRating | None,
+    status: PlaceStatus | None = None,
+    borrowed_cover: CatalogueCover | None = None,
+) -> dict[str, object]:
+    """`status` overrides the stored one: what the author of a place in its screening window sees.
+    `borrowed_cover` comes from `covers.borrowed_for_places`, loaded for a whole page."""
     return {
         "id": place.id,
         "layer": place.layer,
@@ -121,8 +145,7 @@ def place_base_fields(
         "address": place.address,
         "status": status or place.status,
         "trust_score": place.trust_score,
-        "cover_url": place.cover_url,
-        "cover_credit": place.cover_credit,
+        **cover_fields(place.cover_url, place.cover_credit, borrowed_cover),
         "tags": place.tags,
         "rating_avg": place.rating_avg,
         "rating_count": place.rating_count,
@@ -142,17 +165,18 @@ def place_card(
     *,
     combined_rating: CombinedRating | None,
     status: PlaceStatus | None = None,
+    borrowed_cover: CatalogueCover | None = None,
 ) -> PlaceCard:
     """Requires `place.event`, `place.issue` and `place.area` to be loaded; the blend comes from
-    `combined_ratings`, which loads it for a whole page."""
+    `combined_ratings` and the borrowed cover from `covers`, which load them for a whole page."""
     return PlaceCard(
-        **place_base_fields(place, now, combined_rating, status),
+        **place_base_fields(place, now, combined_rating, status, borrowed_cover),
         event=event_brief(place.event, now) if place.event else None,
         issue=IssueBrief(**issue_brief_fields(place.issue)) if place.issue else None,
     )
 
 
-def comment_out(comment: Comment, viewer: User | None) -> CommentOut:
+def comment_out(comment: Comment, viewer: User | None, *, on_review: bool = False) -> CommentOut:
     can_delete = viewer is not None and (viewer.id == comment.author_id or viewer.is_staff)
     return CommentOut(
         id=comment.id,
@@ -160,6 +184,7 @@ def comment_out(comment: Comment, viewer: User | None) -> CommentOut:
         text=comment.text,
         created_at=comment.created_at,
         can_delete=can_delete,
+        on_review=on_review,
     )
 
 
@@ -186,7 +211,7 @@ def route_card_fields(
     route: Route, *, is_saved: bool, status: RouteStatus | None = None
 ) -> dict[str, object]:
     """Requires `route.author` and `route.stops` with their photos and places to be loaded.
-    `status` overrides the stored one: what the author of a quietly held route sees."""
+    `status` overrides the stored one: what the author of a route in its screening window sees."""
     return {
         "id": route.id,
         "title": route.title,

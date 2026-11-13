@@ -2,8 +2,8 @@
 
 The model is an advisor. Its answers are untrusted input: anything that does not match the
 schema is discarded, unknown categories are dropped, numbers are clamped, and a valid opinion
-can only map to the outcomes defined here — release, release for a moderator's look, or a quiet
-hold until a moderator decides.
+can only map to the outcomes defined here — release, release for a moderator's look, or a hold
+until a moderator decides.
 """
 
 from collections.abc import Mapping

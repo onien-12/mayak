@@ -194,7 +194,8 @@ async def standing_for_place(
 
     A decision (`hide` / `reject`) can be appealed once. A place hidden automatically by
     absent votes has no decision yet: its author may add one appeal to the open case.
-    `status` is the one the viewer sees (a quietly held place looks published to its author).
+    `status` is the one the viewer sees (a place in its screening window looks published to its
+    author).
     """
     status = status or place.status
     if status not in NOTED_STATUSES:

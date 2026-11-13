@@ -102,7 +102,7 @@ async def file_complaint(
 
 
 async def _load_target(session: AsyncSession, reporter: User, payload: ComplaintIn) -> Place | Route:
-    """Own content is refused first, so the author of a quietly held place gets the same answer
+    """Own content is refused first, so the author of a place in its screening window gets the same answer
     as for a published one."""
     if payload.target_type is TargetType.ROUTE:
         return await routes.get_public_route(session, payload.target_id, reporter)

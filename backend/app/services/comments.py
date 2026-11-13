@@ -27,13 +27,17 @@ def visible_clause(viewer: User | None) -> object:
 
 async def list_comments(session: AsyncSession, place_id: int, viewer: User | None) -> list[CommentOut]:
     place = await place_queries.get_visible_place(session, place_id, viewer)
-    rows = await session.scalars(
-        select(Comment)
-        .where(Comment.place_id == place.id, visible_clause(viewer))
-        .options(joinedload(Comment.author))
-        .order_by(Comment.created_at, Comment.id)
+    rows = list(
+        await session.scalars(
+            select(Comment)
+            .where(Comment.place_id == place.id, visible_clause(viewer))
+            .options(joinedload(Comment.author))
+            .order_by(Comment.created_at, Comment.id)
+        )
     )
-    return [mappers.comment_out(row, viewer) for row in rows]
+    own = [row.id for row in rows if viewer is not None and row.author_id == viewer.id]
+    held = await quiet_holds.held_ids(session, AiTarget.COMMENT, own)
+    return [mappers.comment_out(row, viewer, on_review=row.id in held) for row in rows]
 
 
 def announce(session: AsyncSession, place: Place, comment: Comment, now: datetime) -> None:

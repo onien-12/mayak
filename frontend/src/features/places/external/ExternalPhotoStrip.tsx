@@ -1,10 +1,13 @@
 import { useState } from 'react';
 
-import { Lightbox, type ViewerPhoto } from '@/shared/ui';
+import { CoverSourceMark, Lightbox, type ViewerPhoto } from '@/shared/ui';
 
 import { useWorkingPhotos } from './useWorkingPhotos';
 
-/** The sources' own photos of the place, hot-linked; a tap opens the viewer. */
+/**
+ * The sources' own photos of the place, hot-linked, each with its service's mark; a tap opens
+ * the viewer, which names the service in full with a link.
+ */
 export function ExternalPhotoStrip({ photos }: { photos: readonly ViewerPhoto[] }) {
   const [index, setIndex] = useState<number | null>(null);
   const { visible, drop } = useWorkingPhotos(photos);
@@ -18,7 +21,7 @@ export function ExternalPhotoStrip({ photos }: { photos: readonly ViewerPhoto[] 
         className="-mx-4 no-scrollbar flex snap-x scroll-px-4 gap-2 overflow-x-auto px-4 lg:-mx-5 lg:scroll-px-5 lg:px-5"
       >
         {visible.map((photo, i) => (
-          <li key={photo.url} className="shrink-0 snap-start">
+          <li key={photo.url} className="relative shrink-0 snap-start">
             <button
               type="button"
               onClick={() => setIndex(i)}
@@ -35,6 +38,7 @@ export function ExternalPhotoStrip({ photos }: { photos: readonly ViewerPhoto[] 
                 className="size-full object-cover"
               />
             </button>
+            {photo.source && <CoverSourceMark source={photo.source} />}
           </li>
         ))}
       </ul>

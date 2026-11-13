@@ -8,6 +8,7 @@ import {
   Button,
   EmptyState,
   ErrorState,
+  OnReviewMark,
   RatingInput,
   RatingStars,
   Skeleton,
@@ -113,6 +114,7 @@ export function RouteReviews({ route }: { route: RouteDetail }) {
                   {review.text && (
                     <p className="mt-2 text-sm whitespace-pre-line text-ink">{review.text}</p>
                   )}
+                  {review.on_review && <OnReviewMark className="mt-2" />}
                 </li>
               ))}
             </ul>

@@ -40,16 +40,22 @@ edit official issue info.
 
 | Level       | Reputation | Vote weight | Publishing                                   | Places / day |
 |-------------|-----------:|------------:|----------------------------------------------|-------------:|
-| `newcomer`  | < 10       | 0.5         | **cold mode** — pre-moderated (`pending`)    | 3            |
+| `newcomer`  | < 10       | 0.5         | published as `unverified` once the automatic check passes (**probation**, below) | 3 |
 | `resident`  | 10 – 49    | 1.0         | published immediately as `unverified`        | 10           |
 | `trusted`   | 50 – 149   | 1.5         | published immediately as `unverified`        | 30           |
 | `expert`    | ≥ 150      | 2.0         | published immediately as `preliminary`       | 100          |
 
 Moderator/admin vote weight: 3.0, publishing like `expert`.
 
-Cold mode (newcomer): may vote, review (5/day), comment, complain (5/day), join events, save
-favorites. Creating places/routes is allowed but pre-moderated and limited; cannot send
-respects. Accounts younger than 24 h have their vote weight halved again (0.25) — protection
+Newcomer: may vote, review (5/day), comment, complain (5/day), join events, save favorites;
+cannot send respects; places are limited to 3 a day. **Probation** (since 2026-11-13, replaces
+the earlier pre-moderation of everything a newcomer publishes): a newcomer's place or route is
+published like anyone's when the automatic check (§24) passes it, but gets no benefit of the
+doubt — whatever the model doubts (`suspicious` of any confidence), holds, or could not check
+at all (no answer, no key, daily limit) goes to a moderator instead of being shown. Comments,
+reviews, notes and photos added to other places are judged as for everyone. No level is
+pre-moderated as a whole any more; `permissions.publishes_directly` is true for all, the
+`premoderation` trigger and the `moderation_approved` reward remain for data created earlier. Accounts younger than 24 h have their vote weight halved again (0.25) — protection
 from coordinated fresh accounts.
 
 ## 3. Trust model for places
@@ -58,7 +64,9 @@ from coordinated fresh accounts.
 
 One active vote per (user, place): `present` | `absent` | `unclear`
 («Присутствует» / «Отсутствует» / «Требует уточнения»). Voting again replaces the previous
-vote and refreshes its timestamp. Authors cannot vote on their own places.
+vote and refreshes its timestamp; a vote can be taken back (the place is recomputed without it, the
+reward for a first vote is not given twice). Authors cannot vote on their own places. In the card
+the three vote buttons carry the counts themselves — there is no separate row of counters.
 
 «Требует уточнения» must say what is unclear (at least 5 characters: «вход со двора, по
 выходным закрыто»). The words are for the moderators, not for the card: the vote opens (or joins)
@@ -85,7 +93,9 @@ A place is **stale** when the last confirmation is older than 180 days (card sho
 
 `status`: `pending | unverified | preliminary | verified | needs_review | hidden | archived`
 
-- `pending` — waiting for pre-moderation (or screening, §24.1); visible only to author and moderators.
+- `pending` — waiting for pre-moderation, or held by the automatic check (§24.1); visible only
+  to author and moderators. During the few seconds of a screening window the author still sees
+  the status the place will get.
 - `unverified` — just added, no independent confirmations.
 - `preliminary` — first confirmations (`P ≥ 1.0`).
 - `verified` — enough independent confirmations (`P ≥ 4.0` **and** ≥ 3 distinct present voters, `P > 2·A`).
@@ -189,7 +199,7 @@ Run on create/edit of places, routes, reviews and comments. Checks never reject 
 themselves: they produce **flags**; a flagged publication goes to `pending` with a moderation
 case (trigger `auto_text` / `auto_image`). Reviews/comments with flags are rejected with 422
 and a hint (cheap to retype). Profanity is not a flag: it is masked on display (§24.5);
-keyboard mashing holds the item quietly and a mashed address is refused (§24.1).
+keyboard mashing holds the item (its author is told why) and a mashed address is refused (§24.1).
 
 Text flags: more than 2 links or a link shortener; shouting (> 70 % caps in ≥ 20 letters) or
 long character repeats; duplicate (same author + same title in 24 h, or same title within 50 m).
@@ -200,8 +210,9 @@ Image checks on upload: real image (Pillow verify), ≤ 8 MB, JPEG/PNG/WebP; re-
 
 A `ModerationCase` targets a place or a route; one open case per target (new triggers are
 merged into it). Triggers: `premoderation`, `complaints`, `absent_votes`, `auto_text`,
-`auto_image`, `auto_ai`, `appeal`, `clarification` (§3.1). A quietly held photo, comment, review or note gets a case of
-its own, listed apart from the queue with two outcomes, `release` and `remove` (§24.1).
+`auto_image`, `auto_ai`, `appeal`, `clarification` (§3.1). A photo, comment, review or note held
+by the automatic check gets a case of its own, listed apart from the queue with two outcomes,
+`release` and `remove`, each notified to its author (§24.1).
 
 `risk` (0..100) = weighted sum: complaints weight, absent weight, auto flags, author level
 (newcomer riskier), layer (`issue`/`event` slightly riskier because time-sensitive).
@@ -210,7 +221,7 @@ Moderator actions (each requires a reason and is written to the immutable modera
 
 | Action            | Effect                                                                                  |
 |-------------------|-----------------------------------------------------------------------------------------|
-| `approve`         | status recomputed from votes (at least `unverified`); complaints dismissed; author +4 if it was `pending` (a quiet hold is only released, §24.1) |
+| `approve`         | status recomputed from votes (at least `unverified`); complaints dismissed; author +4 if it was waiting for pre-moderation (a place held only by the automatic check gets back its status without the +4, §24.1); author notified |
 | `reject`          | status `archived`; author −15; complaints upheld                                        |
 | `request_changes` | stays `pending`; author notified with the reason; editing re-opens a case               |
 | `hide`            | status `hidden`; author −15; complaints upheld                                          |
@@ -278,6 +289,12 @@ Seed reputations are backed by `ReputationEvent` rows so profiles look alive.
 
 ## 11. External source: Афиша VL.ru
 
+**The section is «События», and residents' events lead (since 2026-11-13).** The section that
+lists events is called «События» in the UI (it was «Афиша»). It opens on what residents arrange
+themselves — events and meetups (`origin=community`); the imported city listings below are one
+filter away («Все» / «Афиша VL.ru»), and an empty residents' feed offers both to gather a
+meetup and to show the city listings. A new event is a small meetup by default.
+
 City events are imported from `https://www.vl.ru/afisha/vladivostok` so the afisha is alive
 from day one; user-created events and meetups live next to them.
 
@@ -328,7 +345,7 @@ Any registered user can build a route. A route is an ordered list of **custom wa
 linked to a map place. `via` waypoints are invisible shaping points for trails.
 
 - `visibility`: `private` («только для меня» — a personal plan, never moderated) or `public`
-  (published to everyone under the §2 rules; newcomers are pre-moderated).
+  (published to everyone under the §2 rules; a newcomer's route is on probation like a place).
 - `path_mode`: `roads` (routed along streets, footways and trails from OpenStreetMap — the
   FOSSGIS OSRM service; 2GIS Routing is an optional provider) or `direct` (straight segments —
   for terrain without paths; the author shapes the track with `via` points). The line credits
@@ -382,7 +399,7 @@ is now §24; this section keeps the provider, the input and the hardening.
   routes, imported content, seed data, moderators' own content.
 - When: asynchronously after the write succeeds (background task with its own DB session) —
   publishing is never slowed down by the LLM; until the check is done the item is visible only
-  to its author (§24.1). Timeout 20 s, one retry, any failure → the fallback of §24.1 (logged).
+  to its author, who sees it as published (§24.1). Timeout 20 s, one retry, any failure → the fallback of §24.1 (logged).
 - Input: layer, category name, title, description, tips, address, tags, attributes; for routes —
   title, description, stop titles/notes/landmarks. Photos go one per request (§24.2), never with
   the text. No e-mails, user ids or other personal data of the author are sent.
@@ -397,8 +414,8 @@ is now §24; this section keeps the provider, the input and the hardening.
   can do is suppress a hold — the same as having no LLM.
 - Effects: §24.1. `ok` releases (an open pre-moderation case gets a lower `risk`); `suspicious`
   below 0.6 releases with status `needs_review` and a case `auto_ai` (stays visible with a
-  warning); stronger doubt, any `violation` and low usefulness hold the item quietly — the
-  author is not notified.
+  warning); stronger doubt, any `violation` and low usefulness hold the item — the author is
+  notified once, with the reasons in plain words (§24.1).
 - Tests use a fake client; the network is never touched. The seed does not call the LLM; it
   inserts a few sample `AiReview` rows for the demo moderation cases.
 
@@ -552,8 +569,10 @@ belong to it and are browsed inside its card.
 - Geometry rules: validated (closed, no self-intersections, sane size), simplified to ≤ 200
   vertices for transfer, and nothing in the model is Vladivostok-specific.
 - Membership: a place gets `area_id` automatically on create/edit — the area whose polygon
-  contains the point (the smallest by territory when nested); the author may override it in the form
-  (choose another area or «не относится к локации»). Creating/changing an area re-attaches the
+  contains the point (the smallest by territory when nested). The create form offers no choice: it
+  only names the location the point falls into, and says nothing when there is none («Добавить
+  место сюда» from a location's card keeps that location). The edit form can still move the place
+  to another area or make it a standalone point. Creating/changing an area re-attaches the
   places inside. Places outside any area stay standalone, exactly as before.
 - **Interest** (0..100) — "how much is there and how good is it", recomputed whenever a place
   inside changes status/rating, is added or removed:
@@ -629,6 +648,14 @@ exactly what newcomers in cold mode are allowed to do.
   are stored separately (distinct `external_id`), which keeps that tractable.
 - With thousands of places the list endpoints must stay bounded: `GET /places` returns the
   most trusted first when truncated; areas fold their inner places on the map.
+- **Bare background objects** — OSM objects nobody has confirmed that have nothing to show for
+  themselves: a title that is just the category («Детская площадка», «Спортивная площадка»:
+  about 2 700 yard playgrounds and grounds), or a sight (layer `tourism`) with no photo — a lone
+  monument, plaque or fountain. They are kept and counted but not drawn on the «Карта» section
+  by default. They appear when asked for: their category is chosen, a search matches, or the
+  «Всё из OpenStreetMap» filter is on. A photo (residents', archive or borrowed from a map
+  service) or one confirmation by a resident makes such an object an ordinary place. Named
+  infrastructure from OSM (toilets, drinking water, libraries) stays visible.
 
 ## 19. Enrichment from other catalogues — what is allowed and what is not
 
@@ -648,7 +675,9 @@ What we do instead:
    - Russian Wikipedia `list=geosearch` around a handful of points (10 km circles covering
      `OSM_BBOX`, 6 requests) gives every geotagged article; targets without a Wikidata id are
      matched to them by name (`domain/names`) and distance (200 m for places, the area's radius +
-     300 m for areas);
+     300 m for areas) — never a place to the article of a location it lies in («Нагорный парк»
+     for «Смотровая Нагорного парка»: the article names the whole, `names.names_the_whole`),
+     unless the place is named as that location (it is then the location's own object);
    - Wikidata `wbgetentities`, fifty items a request: main image (P18), Commons category (P373),
      the `ruwiki` article — for every id known from OSM `wikidata` tags, Wikivoyage listings and
      the matched articles;
@@ -659,16 +688,37 @@ What we do instead:
      their Commons category if they have one, else files geotagged within 150 m (areas: their
      radius, ≤ 1 km) — areas first, at most 150 searches; a 403/429 from a service stops every
      further request to it.
-   Kept: JPEG/PNG, short side ≥ 600 px, a free licence, no maps/logos/flags. Photos are attached
+   Kept: JPEG/PNG, short side ≥ 600 px, a free licence, no maps/logos/flags; up to 8 photos a
+   place and 12 an area (linked files first, then the nearest geotagged ones — the searches return
+   up to twenty files each, so the caps cost no request).
+   **Only the object itself** (`domain/archive_photos`, after the first snapshot gave a car, a bird
+   and the house next door to places): a photo is kept when the object's own identity leads to it
+   — named by its source (OSM tag, the guide's image), the image of its Wikidata item, the lead
+   image of its article, a file of its own Commons category — or when its title, description or
+   Commons categories name the object: every distinctive word of the name, in Cyrillic or in Latin
+   letters, outside an address («ул. Мордовцева», «Мордовцева, 8»), with the city and the
+   region not counting and kind words («батарея», «остров») needed only when the name has nothing
+   else. Merely nearby is not enough; none is better than a wrong one. Each photo row of the
+   snapshot records how it was found (`tie`), its description and categories; a row of an older
+   snapshot without `tie` must name the object. Photos and texts go only to public places with a
+   name of their own — never to an archived, hidden or held place, nor to one named after its
+   category. Photos are attached
    only where a place or area has no photos at all (user photos always come first), hot-linked
    through Commons thumbnails, each with `credit = {author, license, source_url}` shown on the
    photo. A Wikipedia paragraph fills only an empty description and is shown with «Текст:
    Википедия, CC BY-SA 4.0» and a link to the article (`description_credit`).
-   **Status (2026-11-11):** Wikimedia answers our client with HTTP 403 «Please respect our robot
-   policy» (https://w.wiki/4wJS) on the very first request to Commons, Wikidata and Wikipedia —
-   the User-Agent policy asks for contact information in the User-Agent, which ours deliberately
-   does not carry. The job is built and tested on fakes; no snapshot is committed until the
-   User-Agent question is decided. Nothing tries to get around the block.
+   **Applying:** the seed applies the committed snapshot to a fresh database; an existing database
+   receives each new version of the file once, at the first start-up after it is committed
+   (`applied_snapshots` remembers the version — a removed archive photo is not brought back on the
+   next restart). Database only, no request to Wikimedia, well under a second. The CLI without
+   `--fetch` applies it again on demand.
+   **Status (2026-11-13):** on 2026-11-11 Wikimedia answered with HTTP 403 «Please respect our
+   robot policy» (https://w.wiki/4wJS); on 2026-11-13 Commons refused with 429 after 7 requests
+   (by design a refused run writes no snapshot). A later run the same day succeeded (552 targets,
+   167 requests) but predates the rule above: its rows carry no `tie`, so applied as it is only the
+   photos whose titles name their objects survive; a new run records the ties. The User-Agent policy asks for contact information in the User-Agent; since
+   2026-11-13 ours carries the address of the site (`https://mayak.ofdm.tech`, the owner's decision;
+   still no personal data). Nothing tries to get around a refusal.
 2. **Aggregate rating from 2GIS** (official Places API, allowed with attribution; verified on
    our key: `fields=items.reviews` → `general_rating`, `general_review_count`) for places and
    areas linked to a 2GIS object (`object_id`). Shown as a separate reference line
@@ -769,7 +819,7 @@ Rules of the experiment:
   include the policy version and target identity, so edits cannot reuse a previous result.
 - Strictly on demand (a card's reviews tab, an area card's block, «Показать ещё»), then cached 7
   days. The card's summary row and photo fallback read the cache only (`cached_only=true`); lists
-  never ask a source (they read cached ratings for §22).
+  never ask a source (they read cached ratings for §22 and the borrowed covers of §25).
   A warm-up CLI prepares a demo database: `uv run python -m
   app.services.experimental.external_reviews.warmup [--source all|yandex|2gis|google] [--limit 40]` looks up the most notable
   eligible objects without a cached answer (areas by interest and community tourism places by
@@ -809,19 +859,33 @@ Rules of the experiment:
   those say `has_more` false. A refused or unreadable page changes nothing stored (answer 502).
 - Data minimisation: stored — rating, text truncated to 600 characters, date, link to the
   original page; **never** the reviewer's name, avatar or profile (personal data). Photos are
-  not stored, only hot-linked URLs are returned.
+  not stored, only hot-linked URLs are returned — of Yandex, what the search page the lookup reads
+  anyway embeds for the organisation, up to 30 (the parser kept 8 before 2026-11-13; stored
+  answers grow at their next lookup). 2GIS (verified 2026-11-13): the main photo of the object's
+  own album, from the catalogue answer the lookup reads anyway when it asks for
+  `items.external_content` too (the project's paid Places key does not return that field), then
+  the photos visitors attached to the reviews the lookup reads (`preview_urls`, 1920 px); a search
+  answer leaves the album out for some map objects, so a match left without any photo asks the
+  object for its album — one request more, at most, inside the lookup's budget (5), and a refusal
+  there costs nothing but that photo. Google: the place's main photo from the search answer and
+  the photos attached to the previewed reviews, asked of the image host at 1280 px; never a
+  reviewer's avatar. Both up to 30, hot-linked, never stored as files.
 - Presentation: a compact summary row under the card title («Яндекс Карты ★ 4,9 · 534 отзыва»,
   tap → the full block); the full, clearly separated block «Отзывы в других сервисах» under our own
   reviews (and in the area card) with the source's aggregate rating, a link «читать на Яндекс
   Картах», and the note «сторонние отзывы, не проверены жителями»; when a card has no photos of
   its own, the source's photos are shown hot-linked as a gallery / cover fallback with «Фото:
-  Яндекс Карты» — never stored as `Photo` rows, never a list cover. Never blended into
-  `rating_avg`, trust or interest; the separate blended figure is §22.
+  Яндекс Карты» — never stored as `Photo` rows; after a card's own photos they follow in the same
+  gallery, each with that mark. An object with no cover at all borrows the first of them as its
+  cover in lists and cards (§25). Never blended into `rating_avg`, trust or interest; the
+  separate blended figure is §22.
 - HTML/JSON from the source is untrusted input: parsed defensively, rendered as plain text.
 - Exit criteria: if the feature is not continued, remove it in one commit — backend: the package
   `app/services/experimental/external_reviews/`, its `include_router` line and import in
   `app/api/v1/__init__.py`, `app/services/combined_ratings.py` with its router dependency there,
   `app/domain/combined_rating.py`, the `combined_rating` fields of the place and area schemas,
+  the borrowed covers (`borrowed_for_*` in `app/services/covers.py` and their callers, the
+  catalogue part of `app/domain/cover.py`, the `cover_source` fields),
   the setting `external_reviews_enabled` (`app/core/config.py`, both
   `.env.example`), `tests/experimental/`, `tests/fixtures/yandex/`, `tests/fixtures/google/`, the section in `docs/API.md`;
   drop the tables `external_review_sources`, `external_reviews`, `external_catalogue_sources`,
@@ -1056,31 +1120,52 @@ score   = match · (0.6 + 0.4 · quality)
 - Settings: `INTERESTS_LLM_ENABLED` (empty = on when the key is set), `INTERESTS_LLM_MODEL`
   (default `typesafe/jev-router`), `INTERESTS_LLM_DAILY_REQUEST_CAP` (default 2000).
 
-## 24. Screening before anyone sees it — quiet hold, usefulness, author standing, masking
+## 24. Screening before anyone sees it — holds, usefulness, author standing, masking
 
 Supersedes the parts of §6 and §14 it contradicts (profanity as a blocking flag; «publishing is
-never held by the LLM»; «the author is notified» for model-driven holds). The principle of §14
-stays: the model never makes a final decision — it can only keep content out of public view until
-a moderator looks. What changes is that it does so **before** anyone else sees the content, and
-that the author is not told.
+never held by the LLM»). The principle of §14 stays: the model never makes a final decision — it
+can only keep content out of public view until a moderator looks. What changes is that it does so
+**before** anyone else sees the content. The author is told when their content did not pass.
 
-### 24.1 Quiet hold
+### 24.1 Screening window and hold
 
-A held item is visible to its author exactly as if it were published — same status, counters and
-place in their lists, no banner, no notification, no trace in the history they can see — and to
-moderators with a «тихое удержание» mark. Nobody else gets it from any endpoint: lists, the map,
-cards, covers, counters, areas, recommendations, search, feeds, statistics.
+Nobody but the author and moderators gets a screened or held item from any endpoint: lists, the
+map, cards, covers, counters, areas, recommendations, search, feeds, statistics.
 
+- **Screening window** (`screening`, normally a few seconds): seamless — the author sees the item
+  as published (same status, counters, place in their lists), nobody else sees it.
+- **Hold** (`held`, the window failed): the author sees the truth and is told why.
+  - A place or route is `pending` for its author too — in cards, lists and counters, exactly like
+    a publication waiting for pre-moderation. Its card carries `screening_hold.reasons` (author
+    and moderators only) and says that the publication did not pass the automatic check, the
+    reasons, that a moderator will decide, that for now only the author sees it and that editing
+    is possible (the moderator sees the new version). A held place gets a history entry
+    «Публикация отправлена на проверку автоматическим фильтром» (old status → `pending`).
+  - A photo, comment, review or note stays visible to its author and is marked `on_review`
+    («На проверке — пока видите только вы»).
+  - The author gets one notification (kind `moderation`) per hold, not per re-check:
+    «Публикация «…» не прошла автоматическую проверку» (or «Маршрут / Фото к / Комментарий к /
+    Отзыв к «…»», «Заметка «…» / на карте»), with the reasons, «Пока её видите только вы —
+    модератор посмотрит и решит.» and, for places and routes, «Можно исправить её — модератор
+    увидит новую версию.»; it links to the place, route or map spot.
+  - **Reasons in two voices.** Moderators read the stored lines with the verdict, the categories,
+    the model's confidence and the usefulness («Текст: нарушение (реклама), уверенность 0.90»).
+    The author reads only what was found and where: «Текст: реклама», «Фото 2: не про место»,
+    «Текст: слишком мало сведений о месте» (low usefulness of a place, no number), «Похоже на
+    случайный набор букв: название». Never the confidence, the usefulness number, the model's
+    summary or anything about the author's standing: a hold that only the standing caused (doubt
+    below 0.6, a check that did not happen) reads as «Нужна ручная проверка модератора».
 - Applies to: places, routes, photos (each photo on its own), comments, reviews, notes.
-- `quiet_holds` (`target_type`, `target_id`, `state` screening · held · released · decided
-  (a moderator confirmed the hold or asked for changes), `reasons`, `source` heuristic · ai ·
-  standing, `shown_status`, timestamps). A held item that its author edits is checked again for
-  the moderator but stays held until the moderator decides. For places and routes the real
-  status becomes `pending`, so the existing visibility rules do the hiding; `shown_status` is what
-  the author keeps seeing. A held review does not count in `rating_avg`; a held photo is never a
-  cover for others.
-- **Screening window**: everything a person publishes starts as `screening` — already invisible to
-  others — and is released when the checks pass, normally within seconds. If the model cannot
+- `quiet_holds` — the name is historical, holds are no longer kept from their authors —
+  (`target_type`, `target_id`, `state` screening · held · released · decided (a moderator
+  confirmed the hold or asked for changes), `reasons`, `source` heuristic · ai · standing,
+  `shown_status`, timestamps). A held item that its author edits is checked again for the
+  moderator but stays held until the moderator decides. For places and routes the real status is
+  `pending` throughout, so the existing visibility rules do the hiding; `shown_status` is the
+  status the item gets back when released, and what the author sees during the window. A held
+  review does not count in `rating_avg`; a held photo is never a cover for others.
+- **Window → release**: everything a person publishes starts as `screening` — already invisible to
+  others — and is released silently when the checks pass, normally within seconds. If the model cannot
   answer in 20 s (or there is no key), the item is released, unless the author's standing is low
   (§24.4) — then it stays held for the moderator. Items stuck in `screening` (restart) are
   re-submitted at start-up and by a periodic sweep.
@@ -1100,13 +1185,18 @@ cards, covers, counters, areas, recommendations, search, feeds, statistics.
   «СМИ», «ЛОР») — so a bare «цук» is left to usefulness.
   `suspicious` below 0.6 keeps today's behaviour: visible, `needs_review`, a case for the moderator.
 - **Moderation**: every hold opens (or joins) a moderation case — trigger `auto_ai`, `auto_image`
-  or `auto_text` — marked quiet, with the model's opinion and, for photos, which photo. `approve`
-  releases the hold (status recomputed as usual, nothing else happens to the author); `reject` /
-  `hide` are the ordinary decisions with their ordinary effects and notifications — from that
-  moment a person has decided. When the author was waiting for pre-moderation anyway (cold mode),
-  `approve` is the ordinary approval. Occurrences of an event series are screened and decided
-  together. Held photos, comments, reviews and notes are listed for moderators with the same two
-  outcomes: release or remove.
+  or `auto_text` — marked as held by the check (`quiet` in the API, a historical name), with the
+  model's opinion and, for photos, which photo. Every decision is an ordinary one the author hears
+  about: `approve` gives the place or route back the status it would have had (recomputed as
+  usual), together with the rest of its event series and its photos; residents of the territory
+  hear about a new place once; the hold's standing penalty is returned; the author gets the
+  approval notification and a history entry (`pending` → the new status); +4 reputation only when
+  the author was waiting for pre-moderation anyway (cold mode). `reject` / `hide` /
+  `request_changes` keep their ordinary effects and notifications. Occurrences of an event series
+  are screened, held and decided together. Held photos, comments, reviews and notes are listed
+  for moderators with two outcomes, release or remove; the author is notified of either
+  («Ваш комментарий проверен и опубликован» / «Ваш комментарий удалён модератором», with the
+  moderator's reason).
 - Imported content and seed data are never held. A moderator's own content is not screened.
 
 ### 24.2 Photos are checked one by one
@@ -1131,7 +1221,7 @@ a city object («Питьевой фонтанчик у входа в парк, 
 description near zero). Stored in `place_quality`; never shown to users and not part of any public
 schema.
 
-- Below 15 → quiet hold (junk does not reach the map). The margin is deliberate: on the real
+- Below 15 → hold (junk does not reach the map; the author reads «слишком мало сведений о месте»). The margin is deliberate: on the real
   model junk scores 0–10 and a bare but real point («Туалет» with no description) about 25.
 - Ordering: where places are cut by `limit`, ties in `trust_score` are broken by usefulness; in
   recommendations (§23.5) a place's quality is multiplied by `0.7 + 0.3 · usefulness / 100` when
@@ -1196,4 +1286,22 @@ picture — sharpness 0.35 · exposure 0.25 · contrast 0.15 · colour 0.15 · p
   else its own archive photo; a route — the best photo among its stops by shape and size, else the
   cover of a linked place. The order of photos in the gallery does not change.
 - Photos of the external catalogues (§20) carry no size and keep the catalogue's own order.
+- **Borrowed cover** (`cover.catalogue_cover`, `covers.borrowed_for_places / _for_areas`): an
+  object left without any cover by the rules above — no resident's, archive or imported photo —
+  borrows the first photo of a map service: Yandex, then Google, then 2GIS (Yandex and Google lead
+  with the place's main photo; a 2GIS album photo comes before its visitors'). A location takes its
+  own entry at a service first, then those of its places, best place first. Read per page from
+  the external reviews' cache while that experiment is on, never stored on the object and never
+  a request to a source (`external_reviews.photos`, next to `ratings`). The answer it comes from
+  must still hold for the object as it is now (§20 evidence for the current fingerprint), but not
+  only within the week its reviews are fresh: the photo is hot-linked, and one that no longer
+  loads gives way to the placeholder. The API marks it with `cover_source = {source, label, url}`
+  (`cover_credit` stays empty); every list and card shows the service's mark on it — «Фото: Яндекс
+  Карты» linked to the object's page there, its initial on a thumbnail.
+- **Only the object itself:** a place never borrows the photos of the location it lies in —
+  the entry matched for that location, or one that names it (`cover.shows_the_parent`: «Нагорный
+  парк» for «Смотровая Нагорного парка») — no photo is better than the park's. A place named as
+  its location («Покровский парк» inside the park of that name) is that location's own object and
+  keeps them. The reverse is fine: a location may show the photos of its places.
+- Route covers and collection covers read the stored place covers and do not borrow.
 

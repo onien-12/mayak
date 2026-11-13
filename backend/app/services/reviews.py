@@ -30,13 +30,20 @@ def _visible_clause(viewer: User | None) -> ColumnElement[bool]:
 
 
 async def _list(session: AsyncSession, target: ColumnElement[bool], viewer: User | None) -> list[ReviewOut]:
-    rows = await session.scalars(
-        select(Review)
-        .where(target, _visible_clause(viewer))
-        .options(joinedload(Review.author))
-        .order_by(Review.created_at.desc(), Review.id.desc())
+    rows = list(
+        await session.scalars(
+            select(Review)
+            .where(target, _visible_clause(viewer))
+            .options(joinedload(Review.author))
+            .order_by(Review.created_at.desc(), Review.id.desc())
+        )
     )
-    return [ReviewOut.model_validate(row) for row in rows]
+    own = [row.id for row in rows if viewer is not None and row.author_id == viewer.id]
+    held = await quiet_holds.held_ids(session, AiTarget.REVIEW, own)
+    items = [ReviewOut.model_validate(row) for row in rows]
+    for item in items:
+        item.on_review = item.id in held
+    return items
 
 
 async def rating_summary(

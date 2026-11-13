@@ -23,6 +23,7 @@ export const placesApi = {
 
   history: (id: number) => api.get<HistoryEntry[]>(`/places/${id}/history`),
   vote: (id: number, input: VoteInput) => api.post<PlaceDetail>(`/places/${id}/votes`, input),
+  withdrawVote: (id: number) => api.delete<PlaceDetail>(`/places/${id}/votes`),
 
   reviews: (id: number) => api.get<Review[]>(`/places/${id}/reviews`),
   saveReview: (id: number, input: ReviewInput) => api.post<Review>(`/places/${id}/reviews`, input),

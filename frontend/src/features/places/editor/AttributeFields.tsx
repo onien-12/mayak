@@ -1,9 +1,10 @@
-import { Controller, useFormContext } from 'react-hook-form';
+import { Controller, useFormContext, useWatch } from 'react-hook-form';
 
 import type { FieldDef } from '@/shared/api';
 import { cn } from '@/shared/lib/cn';
 import { Field, Input, Select } from '@/shared/ui';
 
+import { isRelevantFact } from '../attributeRules';
 import type { PlaceFormValues } from './placeForm';
 
 const ANSWERS = [
@@ -50,8 +51,11 @@ function YesNo({ label, value, onChange }: YesNoProps) {
 /** Optional facts defined by the category `fields` (drives the card and attribute filters). */
 export function AttributeFields({ fields }: { fields: readonly FieldDef[] }) {
   const { control, register } = useFormContext<PlaceFormValues>();
-  const booleans = fields.filter((field) => field.type === 'boolean');
-  const others = fields.filter((field) => field.type !== 'boolean');
+  // «Бесплатно — да» leaves nothing to say about the price: such fields step aside.
+  const answers = useWatch({ control, name: 'attributes' });
+  const asked = fields.filter((field) => isRelevantFact(field.key, answers));
+  const booleans = asked.filter((field) => field.type === 'boolean');
+  const others = asked.filter((field) => field.type !== 'boolean');
 
   return (
     <div className="flex flex-col gap-3">

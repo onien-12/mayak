@@ -188,7 +188,7 @@ async def _daily_counts(
 
 async def _activity(session: AsyncSession, now: datetime) -> list[ActivityDay]:
     """Residents' places and votes per UTC day for the last 30 days, without gaps; places still
-    screened or quietly held are not counted (SPEC §24.1)."""
+    screened or held are not counted (SPEC §24.1)."""
     first_day = (now - timedelta(days=ACTIVITY_DAYS - 1)).replace(hour=0, minute=0, second=0, microsecond=0)
     not_held = Place.id.not_in(quiet_holds.active_ids(AiTarget.PLACE))
     places = await _daily_counts(session, Place.created_at, first_day, _IS_COMMUNITY, not_held)

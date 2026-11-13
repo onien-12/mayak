@@ -75,7 +75,7 @@ export function BuilderMapLayer({
               position={stop}
               anchor={[VIA_DOT_SIZE / 2, VIA_DOT_SIZE / 2]}
               zIndex={31}
-              label="Точка трека: перетащите или нажмите, чтобы удалить"
+              label="Промежуточная точка: перетащите или нажмите, чтобы удалить"
               onTap={() => removeWithUndo(stop.id)}
               onDragEnd={(point) => updateStop(stop.id, point)}
             >

@@ -65,6 +65,16 @@ def _is_distinctive(word: str) -> bool:
     return word not in NOISE_WORDS and _kind(word) is None and (len(word) > 1 or word.isdigit())
 
 
+def words(name: str) -> list[str]:
+    """The name's words, folded (ё → е), without a trailing «(…)» qualifier."""
+    return _words(name)
+
+
+def is_distinctive(word: str) -> bool:
+    """A folded word that carries identity — not a kind word, noise or an initial."""
+    return _is_distinctive(word)
+
+
 def distinctive_stems(name: str) -> set[str]:
     return {word[:STEM_LENGTH] for word in _words(name) if _is_distinctive(word)}
 
@@ -92,6 +102,13 @@ def similar_names(ours: str, theirs: str) -> bool:
 def same_name(ours: str, theirs: str) -> bool:
     """The same distinctive words and the same kinds («Приморский океанариум» in any spelling)."""
     return distinctive_stems(ours) == distinctive_stems(theirs) and kinds(ours) == kinds(theirs)
+
+
+def names_the_whole(whole: str, name: str) -> bool:
+    """`name` denotes the object called `whole` itself, in any spelling or a longer form, rather
+    than a part of it: similar names, and no kind the whole's name does not state. «Нагорный парк
+    культуры» names the park; «Смотровая площадка Нагорного парка» names a part of it."""
+    return similar_names(whole, name) and kinds(name) <= kinds(whole)
 
 
 def same_kind_only(ours: str, theirs: str) -> bool:

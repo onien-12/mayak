@@ -100,3 +100,40 @@ def test_an_unreadable_file_has_no_measurements(tmp_path_factory: pytest.TempPat
     _scene().save(buffer, format="JPEG")
     good.write_bytes(buffer.getvalue())
     assert photo_metrics.measure_file(good) is not None
+
+
+def offer(source: str, *urls: str) -> cover.CataloguePhotos:
+    return cover.CataloguePhotos(source, urls, f"https://{source}.example/org")
+
+
+def test_a_cover_is_borrowed_only_where_there_is_none() -> None:
+    offers = [[offer("google", "g1"), offer("yandex", "y1", "y2")]]
+    assert cover.catalogue_cover("/media/own.jpg", offers) is None, "own, archive or imported first"
+    assert cover.catalogue_cover(None, offers) == cover.CatalogueCover(
+        "yandex", "y1", "https://yandex.example/org"
+    )
+    assert cover.catalogue_cover(None, [[offer("yandex")], [offer("2gis", "t1")]]) == cover.CatalogueCover(
+        "2gis", "t1", "https://2gis.example/org"
+    ), "an entry without photos gives way to the next offer"
+    main_photo_first = [[offer("2gis", "t1"), offer("google", "g1")]]
+    assert cover.catalogue_cover(None, main_photo_first).source == "google", "a main photo before visitors'"
+    location = [[], [offer("google", "inside-best")], [offer("yandex", "inside-second")]]
+    assert cover.catalogue_cover(None, location).url == "inside-best", "the best place first, not the service"
+    assert cover.catalogue_cover(None, []) is None
+
+
+@pytest.mark.parametrize(
+    ("place", "parent", "entry_id", "entry_title", "parent_ids", "parents"),
+    [
+        ("Смотровая Нагорного парка", "Нагорный парк", "18", "Нагорный парк", {"18"}, True),
+        ("Смотровая Нагорного парка", "Нагорный парк", "19", "Нагорный парк культуры", set(), True),
+        ("Смотровая Нагорного парка", "Нагорный парк", "16", "Смотровая площадка парка", {"18"}, False),
+        ("Колесо обозрения", "Спортивная набережная", "7", "Карусель", {"7"}, True),
+        ("Покровский парк", "Покровский парк", "23", "Покровский парк", {"23"}, False),
+        ("Музей", None, "1", "Музей", set(), False),
+    ],
+)
+def test_a_place_never_borrows_the_photos_of_its_location(
+    place: str, parent: str | None, entry_id: str, entry_title: str, parent_ids: set[str], parents: bool
+) -> None:
+    assert cover.shows_the_parent(place, parent, entry_id, entry_title, parent_ids) is parents

@@ -1,11 +1,11 @@
 import { useState } from 'react';
 
-import type { Layer, PhotoCredit } from '../api/types';
+import type { CoverSource, Layer, PhotoCredit } from '../api/types';
 import { cn } from '../lib/cn';
 import { LAYER_META } from '../lib/labels';
 import { TONES } from '../lib/tones';
 import { CategoryGlyph } from './CategoryGlyph';
-import { CreditMark } from './PhotoCredit';
+import { CoverSourceMark, CreditMark } from './PhotoCredit';
 
 interface PlacePhotoProps {
   src: string | null | undefined;
@@ -15,6 +15,8 @@ interface PlacePhotoProps {
   alt: string;
   /** Licence of an external cover photo: a subtle «©» on the image. */
   credit?: PhotoCredit | null;
+  /** The map service a borrowed cover comes from: its mark on the image. */
+  source?: CoverSource | null;
   className?: string;
 }
 
@@ -22,7 +24,7 @@ interface PlacePhotoProps {
  * Cover image of a place. Without a photo (or when it fails to load) shows a designed
  * placeholder: the layer tint, a lighthouse beam and the category glyph.
  */
-export function PlacePhoto({ src, layer, slug, alt, credit, className }: PlacePhotoProps) {
+export function PlacePhoto({ src, layer, slug, alt, credit, source, className }: PlacePhotoProps) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
 
   if (src && failedSrc !== src) {
@@ -32,14 +34,16 @@ export function PlacePhoto({ src, layer, slug, alt, credit, className }: PlacePh
         alt={alt}
         loading="lazy"
         onError={() => setFailedSrc(src)}
-        className={cn('bg-canvas object-cover', credit ? 'size-full' : className)}
+        referrerPolicy={source ? 'no-referrer' : undefined}
+        className={cn('bg-canvas object-cover', credit || source ? 'size-full' : className)}
       />
     );
-    if (!credit) return image;
+    if (!credit && !source) return image;
     return (
       <span className={cn('relative block overflow-hidden', className)}>
         {image}
-        <CreditMark credit={credit} />
+        {credit && <CreditMark credit={credit} />}
+        {!credit && source && <CoverSourceMark source={source} />}
       </span>
     );
   }

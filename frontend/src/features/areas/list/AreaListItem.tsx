@@ -8,7 +8,7 @@ import { cn } from '@/shared/lib/cn';
 import { pluralize, PLURALS } from '@/shared/lib/format';
 import { AREA_KIND_META } from '@/shared/lib/labels';
 import { TONES } from '@/shared/lib/tones';
-import { CategoryGlyph, CreditMark, ListRating } from '@/shared/ui';
+import { CategoryGlyph, CoverSourceMark, CreditMark, ListRating } from '@/shared/ui';
 
 import { AreaPlaceholder } from '../card/AreaCover';
 import { InterestMeter } from '../card/InterestMeter';
@@ -28,10 +28,12 @@ export function AreaThumb({ area }: { area: AreaCard }) {
         src={area.cover_url}
         alt=""
         loading="lazy"
+        referrerPolicy={area.cover_source ? 'no-referrer' : undefined}
         onError={() => setFailed(true)}
         className="size-full bg-canvas object-cover"
       />
       {area.cover_credit && <CreditMark credit={area.cover_credit} />}
+      {!area.cover_credit && area.cover_source && <CoverSourceMark source={area.cover_source} />}
     </span>
   );
 }

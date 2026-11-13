@@ -13,7 +13,7 @@ import { DecisionBar, DecisionDone } from './DecisionBar';
 import { DecisionDialog } from './DecisionDialog';
 import { availableActions, HELD_KIND_LABELS } from './moderationMeta';
 import { RiskMeter } from './RiskMeter';
-import { HiddenSignals, PhotoReviewsCard, QuietHoldBanner } from './ScreeningCards';
+import { HiddenSignals, PhotoReviewsCard, ScreeningHoldBanner } from './ScreeningCards';
 import { TargetPreview } from './TargetPreview';
 import { findNextCase, useCase, useResolveCase, type QueueFilters } from './useModeration';
 
@@ -61,7 +61,7 @@ function CaseBody({ detail, queue }: { detail: ModerationCaseDetail; queue: Queu
           {detail.resolution && (
             <ResolutionCard resolution={detail.resolution} resolvedAt={detail.resolved_at} />
           )}
-          {open && <QuietHoldBanner detail={detail} />}
+          {open && <ScreeningHoldBanner detail={detail} />}
           <div className="flex items-center gap-3 rounded-card bg-canvas p-3">
             <RiskMeter risk={detail.risk} size={56} />
             <div className="min-w-0 text-sm text-ink-soft">

@@ -6,7 +6,7 @@ import { cn } from '@/shared/lib/cn';
 import { formatDuration } from '@/shared/lib/format';
 import { STOP_KIND_META } from '@/shared/lib/labels';
 import { TONES } from '@/shared/lib/tones';
-import { PhotoGrid, StaggerItem } from '@/shared/ui';
+import { OnReviewMark, PhotoGrid, StaggerItem } from '@/shared/ui';
 
 import { legLabel, type NumberedStop } from '../lib/stops';
 import { LandmarkNote } from '../ui/LandmarkNote';
@@ -73,6 +73,7 @@ export function StopItem({ item, last, active, onSelect, ref }: StopItemProps) {
         {stop.photos.length > 0 && (
           <PhotoGrid photos={stop.photos} alt={stop.title} className="mt-2.5" />
         )}
+        {stop.photos.some((photo) => photo.on_review) && <OnReviewMark className="mt-2" />}
         {(stop.stay_min > 0 || stop.place) && (
           <div className="mt-2.5 flex flex-wrap items-center gap-2">
             {stop.stay_min > 0 && (

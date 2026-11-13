@@ -23,7 +23,26 @@ interface AreaFieldProps {
 const ref = (area: AreaCard): AreaRef => ({ id: area.id, title: area.title });
 
 /**
- * «Локация: Нагорный парк» — detected from the point exactly like the server does it
+ * Creating: no choice to make — a point inside a location belongs to it, a point outside does
+ * not. Only says which location the publication gets into, and nothing when there is none.
+ */
+export function AreaNote({ point, value }: Pick<AreaFieldProps, 'point' | 'value'>) {
+  const { detected } = useAreasAround(point);
+  const area = value.kind === 'area' ? value.area : value.kind === 'auto' ? detected : null;
+  if (!area) return null;
+
+  return (
+    <p className="flex items-center gap-1.5 text-sm text-ink-soft">
+      <LandPlot size={15} aria-hidden className="shrink-0 text-ink-faint" />
+      <span className="truncate">
+        Локация: <span className="font-medium text-ink">{area.title}</span>
+      </span>
+    </p>
+  );
+}
+
+/**
+ * Editing: «Локация: Нагорный парк» — detected from the point exactly like the server does it
  * (smallest territory containing the point); the author may pick another one or none.
  */
 export function AreaField({ point, value, onChange }: AreaFieldProps) {

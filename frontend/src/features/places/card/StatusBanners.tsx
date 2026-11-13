@@ -3,12 +3,17 @@ import { Archive, CircleAlert, Clock, EyeOff } from 'lucide-react';
 import type { PlaceDetail } from '@/shared/api';
 import { Banner, Button } from '@/shared/ui';
 
+import { ScreeningHoldBanner } from './ScreeningHoldBanner';
+
 interface StatusBannersProps {
   place: PlaceDetail;
   onAppeal: () => void;
 }
 
-/** Explains non-public and disputed states: pending, hidden, archived, needs review. */
+/**
+ * Explains non-public and disputed states: pending (and why, when the automatic check held the
+ * publication), hidden, archived, needs review.
+ */
 export function StatusBanners({ place, onAppeal }: StatusBannersProps) {
   const note = place.moderation_note && (
     <p className="mt-1.5 rounded-lg bg-surface/70 px-2.5 py-1.5 text-ink">
@@ -24,6 +29,12 @@ export function StatusBanners({ place, onAppeal }: StatusBannersProps) {
 
   switch (place.status) {
     case 'pending':
+      if (place.screening_hold)
+        return (
+          <ScreeningHoldBanner hold={place.screening_hold} what="place">
+            {note}
+          </ScreeningHoldBanner>
+        );
       return (
         <Banner tone="neutral" icon={Clock} title="На проверке у модератора">
           Публикацию пока видите только вы. После проверки она появится на карте для всех.

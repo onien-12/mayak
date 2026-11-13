@@ -35,7 +35,7 @@ _IMAGE_INFO = {
     "prop": "imageinfo|coordinates",
     "iiprop": "url|extmetadata|size|mime",
     "iiurlwidth": str(THUMB_WIDTH_PX),
-    "iiextmetadatafilter": "Artist|LicenseShortName",
+    "iiextmetadatafilter": "Artist|LicenseShortName|ImageDescription|Categories",
 }
 _REFUSALS = frozenset({httpx.codes.FORBIDDEN, httpx.codes.TOO_MANY_REQUESTS})
 _COMMON = {"format": "json", "formatversion": "2", "maxlag": "5"}

@@ -1,5 +1,6 @@
 import { CircleAlert, Clock, EyeOff, Lock } from 'lucide-react';
 
+import { ScreeningHoldBanner } from '@/features/places';
 import type { RouteDetail } from '@/shared/api';
 import { Banner } from '@/shared/ui';
 
@@ -15,6 +16,8 @@ export function RouteStateBanner({ route }: { route: RouteDetail }) {
   }
   switch (route.status) {
     case 'pending':
+      if (route.screening_hold)
+        return <ScreeningHoldBanner hold={route.screening_hold} what="route" />;
       return (
         <Banner tone="infrastructure" icon={Clock} title="На проверке у модератора">
           Маршрут появится в каталоге после проверки — обычно это быстро. Ссылка уже работает для

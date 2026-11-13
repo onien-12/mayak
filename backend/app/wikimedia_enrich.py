@@ -3,7 +3,9 @@ Wikimedia (SPEC §19).
 
 Without `--fetch` the committed snapshot is applied to the configured database: photos where a
 place or area has none, Wikipedia summaries where the description is empty — idempotent, safe on
-a long-running database. With it, the snapshot is first rebuilt with a few batched requests.
+a long-running database. The application does the same by itself once per committed version of
+the snapshot, at start-up (`seed.runner.apply_wikimedia`). With `--fetch`, the snapshot is first
+rebuilt with a few batched requests; a refusal from any service leaves the committed one as it is.
 Targets are the seed's own tourism places and areas, the tourism places and territories of the
 OpenStreetMap snapshot and the listings of the Wikivoyage snapshot; no database is needed for that.
 """
@@ -18,20 +20,21 @@ from app.domain import geo, geometry
 from app.domain.enums import Layer
 from app.seed import areas as area_data
 from app.seed import catalog
-from app.seed.lookup import ALL_PLACES, area_key, place_key, seed_objects
+from app.seed.lookup import ALL_PLACES, area_key, place_key
 from app.seed.runner import (
     OSM_SNAPSHOT_FILE,
     WIKIMEDIA_SNAPSHOT_FILE,
     WIKIVOYAGE_SNAPSHOT_FILE,
+    apply_wikimedia,
     load_area_outlines,
 )
-from app.services import areas, enrichment
+from app.services import areas
 from app.services.interests import tagging as interest_tagging
 from app.services.osm import snapshot as osm_snapshot
 from app.services.osm.elements import OsmElement
 from app.services.osm.mapping import UNNAMED_TITLES
 from app.services.osm.normaliser import AreaDraft, PlaceDraft, normalise
-from app.services.wikimedia import apply, collector, parser, snapshot
+from app.services.wikimedia import collector, parser, snapshot
 from app.services.wikimedia.client import WikimediaClient
 from app.services.wikimedia.collector import Target
 from app.services.wikivoyage import normaliser as guide
@@ -155,17 +158,14 @@ async def _main(fetch: bool) -> None:
     try:
         await database.create_schema()
         async with database.session_factory() as session:
-            keyed = await enrichment.keyed_objects(session)
-            seeded = await seed_objects(session)
-            keyed.merge(seeded.places, seeded.areas)
             now = utcnow()
-            report = await apply.apply_snapshot(session, snapshot.read(WIKIMEDIA_SNAPSHOT_FILE), keyed, now)
+            report = await apply_wikimedia(session, now, always=True)
             await areas.refresh_all(session, now)
             await interest_tagging.tag_stale(session, now)
             await session.commit()
     finally:
         await database.dispose()
-    print(f"Wikimedia: {report.summary()}")
+    print(f"Wikimedia: {report.summary() if report else 'снимка нет, применять нечего'}")
 
 
 def main() -> None:

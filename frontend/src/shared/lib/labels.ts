@@ -563,7 +563,7 @@ export const STOP_KIND_META: Record<StopKind, DescribedMeta> = {
     description: 'Опасный участок: обрыв, брод, трасса',
   },
   via: {
-    label: 'Точка трека',
+    label: 'Промежуточная точка',
     tone: 'neutral',
     icon: Waypoints,
     description: 'Невидимая точка, уточняющая линию маршрута',
@@ -863,7 +863,7 @@ export const MODERATION_ACTION_META: Record<ModerationAction, ModerationActionMe
     done: 'Выпущено',
     tone: 'success',
     icon: Eye,
-    description: 'Проверка ошиблась: все увидят, автор ничего не узнает',
+    description: 'Проверка ошиблась: все увидят, автор получит уведомление, что опубликовано',
   },
   remove: {
     label: 'Убрать',

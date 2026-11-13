@@ -24,7 +24,7 @@ export function EventsFiltersSheet({
     <Modal
       open={open}
       onClose={onClose}
-      title="Фильтры афиши"
+      title="Фильтры событий"
       footer={
         <>
           <Button variant="secondary" onClick={reset} disabled={activeFilters === 0}>

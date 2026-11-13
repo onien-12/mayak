@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { cn } from '@/shared/lib/cn';
 import { formatDate, formatRelative } from '@/shared/lib/format';
-import { RatingStars, StaggerItem, UserChip } from '@/shared/ui';
+import { OnReviewMark, RatingStars, StaggerItem, UserChip } from '@/shared/ui';
 
 import type { FeedEntry } from './feed';
 import { SourceMark } from './SourceMark';
@@ -94,6 +94,7 @@ export function ReviewCard({ entry, index, mine = false }: ReviewCardProps) {
         </div>
       )}
       {review.text && <ClampedText text={review.text} />}
+      {entry.kind === 'own' && entry.review.on_review && <OnReviewMark className="self-start" />}
     </StaggerItem>
   );
 }

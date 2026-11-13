@@ -14,6 +14,8 @@ from app.domain.enums import (
     HistoryKind,
     IssueStage,
     ModerationAction,
+    ModerationTrigger,
+    PlaceStatus,
 )
 from app.models import AiReview
 from app.schemas.moderation import ResolveIn
@@ -119,7 +121,18 @@ async def _complain(
     )
 
 
+async def _send_to_moderator(ctx: SeedContext, place_key: str, days_ago: float) -> None:
+    """The automatic check kept a newcomer's place for a moderator (SPEC §24.1)."""
+    place = ctx.places[place_key]
+    place.status = PlaceStatus.PENDING
+    await moderation_cases.open_case(
+        ctx.session, moderation_cases.place_target(place), ModerationTrigger.AUTO_AI, now=ctx.ago(days_ago)
+    )
+
+
 async def _premoderation(ctx: SeedContext) -> None:
+    await _send_to_moderator(ctx, "rest_tim_bench", 14.2)
+    await _send_to_moderator(ctx, "spam_tours", 8)
     await _decide(
         ctx, "rest_tim_bench", ModerationAction.APPROVE, "Точка существует, описание понятное. Спасибо!", 14
     )

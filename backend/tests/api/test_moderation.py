@@ -131,11 +131,11 @@ async def test_premoderation_approve_and_reject(world: World, client: AsyncClien
     approved = (await _resolve(moderator, cases[good["id"]], "approve", "Всё верно")).json()
     assert approved["place"]["status"] == "unverified"
     assert (await client.get(f"{API}/places/{good['id']}")).status_code == 200
-    assert await _reputation(newcomer) == 4
+    assert await _reputation(newcomer) == 0
 
     rejected = (await _resolve(moderator, cases[bad["id"]], "reject", "Такой точки не существует")).json()
     assert rejected["place"]["status"] == "archived"
-    assert await _reputation(newcomer) == 4 - 15
+    assert await _reputation(newcomer) == -15
     own = (await newcomer.get(f"/places/{bad['id']}")).json()
     assert own["moderation_note"] == "Такой точки не существует"
     assert own["can_appeal"] is True

@@ -22,6 +22,8 @@ class MapNoteOut(OwnedText):
     created_at: datetime
     can_delete: bool
     reported_by_me: bool
+    on_review: bool = False
+    """The viewer's own note that did not pass the screening: only they and moderators see it."""
 
     @model_validator(mode="after")
     def _own_texts(self) -> Self:

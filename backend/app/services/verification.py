@@ -208,7 +208,10 @@ async def apply_vote(
     vote = await session.scalar(select(Vote).where(Vote.place_id == place.id, Vote.user_id == voter.id))
     if vote is None:
         vote = Vote(place_id=place.id, user_id=voter.id)
-        await reputation.award(session, voter, ReputationReason.VOTE_CAST, now=now, place_id=place.id)
+        # Once per place: a vote taken back and cast again is not a second contribution.
+        await reputation.award_once_per_place(
+            session, voter, ReputationReason.VOTE_CAST, place_id=place.id, now=now
+        )
     vote.kind, vote.weight, vote.is_near, vote.comment, vote.created_at = kind, weight, is_near, comment, now
     session.add(vote)
     await session.flush()
@@ -248,6 +251,23 @@ async def cast_vote(session: AsyncSession, voter: User, place_id: int, payload: 
             session, moderation_cases.place_target(place), ModerationTrigger.CLARIFICATION, now=now
         )
     await session.commit()
+    return await place_details.build(session, place, voter, now)
+
+
+async def withdraw_vote(session: AsyncSession, voter: User, place_id: int) -> PlaceDetail:
+    """Take the voter's vote back: the place is recomputed without it. No vote — nothing changes.
+
+    What an `unclear` vote said has already reached the moderators and stays with them.
+    """
+    now = utcnow()
+    place = await place_queries.get_visible_place(session, place_id, voter)
+    vote = await session.scalar(select(Vote).where(Vote.place_id == place.id, Vote.user_id == voter.id))
+    if vote is not None:
+        await session.delete(vote)
+        await session.flush()
+        await recompute_place(session, place, now)
+        await locality.refresh_confidence(session, voter, now)
+        await session.commit()
     return await place_details.build(session, place, voter, now)
 
 

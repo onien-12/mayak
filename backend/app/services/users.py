@@ -172,7 +172,7 @@ async def _count(session: AsyncSession, model: type, *conditions: object) -> int
 
 
 async def _stats(session: AsyncSession, user_id: int, viewer: User | None) -> UserStats:
-    """Counters as the viewer may see them: the user's own quietly held publications count for
+    """Counters as the viewer may see them: the user's own publications in a screening window count for
     the user alone (SPEC §24.1)."""
     is_own = viewer is not None and viewer.id == user_id
     own = viewer if is_own else None

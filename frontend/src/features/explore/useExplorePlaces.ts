@@ -3,10 +3,10 @@ import { useMemo } from 'react';
 
 import { useMap, useMapFolded, useMapViewport, useUserLocation } from '@/features/map';
 import { placesApi, queryKeys, type Layer, type PlaceCard, type PlacesQuery } from '@/shared/api';
-import { useDebouncedValue } from '@/shared/hooks';
+import { useCategories, useDebouncedValue } from '@/shared/hooks';
 import { boundsContain, boundsToBbox, haversine, snapBoundsOutward } from '@/shared/lib/geo';
 import { LAYERS } from '@/shared/lib/labels';
-import { isUnconfirmedOsm } from '@/shared/lib/osm';
+import { isBareBackground, isUnconfirmedOsm } from '@/shared/lib/osm';
 
 import { useExploreFilters, type ExploreFilters } from './filtersStore';
 
@@ -92,7 +92,9 @@ export function useExplorePlaces() {
   const params = buildQuery(filters, activeSearch, bbox);
   const hasLayers = filters.layers.length > 0;
 
-  const cityView = useMapFolded() && !activeSearch && filters.categoryIds.length === 0;
+  // «Всё из OpenStreetMap» asks for the base layer at any zoom, like a search or a category does.
+  const cityView =
+    useMapFolded() && !activeSearch && filters.categoryIds.length === 0 && !filters.includeUnnamed;
   const trustedOnly = filters.minStatus !== 'any';
   const enabled = hasLayers && (bbox !== undefined || activeSearch !== '' || status !== 'loading');
 
@@ -108,9 +110,19 @@ export function useExplorePlaces() {
 
   // No layers — nothing to draw: an empty list clears the map, `undefined` would keep the last markers.
   const data = hasLayers ? query.data : NO_PLACES;
+  // Bare OpenStreetMap objects (nameless yard playgrounds, lone monuments without a photo) stay
+  // out unless asked for: by their category, by a search or by the «Всё из OpenStreetMap» filter.
+  const { byId } = useCategories();
+  const { includeUnnamed, categoryIds } = filters;
   const places = useMemo(
-    () => (trustedOnly ? data?.filter((place) => !isUnconfirmedOsm(place)) : data),
-    [data, trustedOnly],
+    () =>
+      data?.filter((place) => {
+        if (!isUnconfirmedOsm(place)) return true;
+        if (trustedOnly) return false;
+        if (includeUnnamed || activeSearch || categoryIds.includes(place.category_id)) return true;
+        return !isBareBackground(place, byId.get(place.category_id)?.name);
+      }),
+    [data, trustedOnly, includeUnnamed, activeSearch, categoryIds, byId],
   );
   const bounds = viewport?.bounds;
   const origin = location?.point ?? viewport?.center;

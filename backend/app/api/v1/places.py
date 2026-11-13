@@ -141,6 +141,11 @@ async def cast_vote(place_id: int, payload: VoteIn, user: CurrentUser, session: 
     return await verification.cast_vote(session, user, place_id, payload)
 
 
+@router.delete("/places/{place_id}/votes", dependencies=[Depends(_vote_limit)])
+async def withdraw_vote(place_id: int, user: CurrentUser, session: SessionDep) -> PlaceDetail:
+    return await verification.withdraw_vote(session, user, place_id)
+
+
 @router.get("/places/{place_id}/reviews")
 async def list_reviews(place_id: int, viewer: OptionalUser, session: SessionDep) -> list[ReviewOut]:
     return await reviews.list_place_reviews(session, place_id, viewer)

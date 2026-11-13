@@ -42,7 +42,7 @@ export function InterestsSettings() {
           <h3 id="my-interests" className="text-base font-semibold text-ink">
             Мои интересы
           </h3>
-          <p className="text-sm text-ink-soft">Это покажем первым на карте и в афише</p>
+          <p className="text-sm text-ink-soft">Это покажем первым на карте и в событиях</p>
         </div>
       </div>
 

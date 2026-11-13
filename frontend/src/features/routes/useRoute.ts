@@ -4,6 +4,7 @@ import {
   ApiError,
   errorMessage,
   queryKeys,
+  rereadAfterCheck,
   routesApi,
   type ReviewInput,
   type RouteDetail,
@@ -93,6 +94,7 @@ export function useSaveRouteReview(id: number, updating: boolean) {
       void queryClient.invalidateQueries({ queryKey: queryKeys.routes.reviews(id) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.routes.detail(id) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.routes.lists });
+      rereadAfterCheck([queryKeys.routes.reviews(id), queryKeys.routes.detail(id)]);
     },
     onError: (error) => toast.error(errorMessage(error)),
   });

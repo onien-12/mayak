@@ -49,7 +49,8 @@ const DEFAULTS: EventsFilters = {
   range: null,
   categoryIds: [],
   kind: 'all',
-  origin: 'all',
+  // What residents arrange themselves is the point of the section; city listings are a filter away.
+  origin: 'community',
   free: false,
   past: false,
   radiusKm: null,
@@ -71,7 +72,11 @@ export const useEventsFilters = create<EventsFiltersState>()(
       },
       setKind: (kind) => set({ kind }),
       setOrigin: (origin) => set({ origin }),
-      toggleFree: () => set({ free: !get().free }),
+      // Among free events there is nothing to order by price.
+      toggleFree: () => {
+        const free = !get().free;
+        set({ free, ...(free && get().sort === 'price' && { sort: 'start' }) });
+      },
       togglePast: () => set({ past: !get().past }),
       setRadius: (radiusKm) => set({ radiusKm }),
       setSort: (sort) => set({ sort }),
@@ -79,7 +84,10 @@ export const useEventsFilters = create<EventsFiltersState>()(
     }),
     {
       name: 'mayak-events',
-      version: 1,
+      version: 2,
+      // v1 remembered «все» as the default source; the section now opens on residents' events.
+      migrate: (stored, version) =>
+        version < 2 ? { ...(stored as EventsFilters), origin: DEFAULTS.origin } : stored,
       partialize: ({ search: _search, ...state }) => state,
     },
   ),
@@ -90,7 +98,7 @@ export function countActiveFilters(filters: EventsFilters): number {
   return (
     filters.categoryIds.length +
     Number(filters.kind !== 'all') +
-    Number(filters.origin !== 'all') +
+    Number(filters.origin !== DEFAULTS.origin) +
     Number(filters.free) +
     Number(filters.past) +
     Number(filters.radiusKm !== null) +

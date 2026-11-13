@@ -212,3 +212,29 @@ async def test_moderator_attaches_official_info(world: World) -> None:
     toilet = await world.create_place(author)
     not_issue = await moderator.patch(f"/places/{toilet['id']}/issue/official", json={"stage": "resolved"})
     assert not_issue.status_code == 400
+
+
+async def test_a_vote_can_be_taken_back(world: World) -> None:
+    author = await world.actor("author", reputation=20)
+    expert = await world.actor("expert", reputation=200)
+    place = await world.create_place(author, "viewpoint")
+
+    voted = await world.vote(expert, place["id"])
+    assert voted["status"] == "preliminary"
+    assert await _reputation(expert) == 202
+
+    response = await expert.delete(f"/places/{place['id']}/votes")
+    assert response.status_code == 200, response.text
+    withdrawn = response.json()
+    assert withdrawn["verification"]["my_vote"] is None
+    assert withdrawn["verification"]["present"] == 0
+    assert withdrawn["status"] == "unverified"
+    assert withdrawn["trust_score"] == place["trust_score"]
+    assert withdrawn["last_confirmed_at"] is None
+
+    # Nothing to take back: the place is returned as it is.
+    assert (await expert.delete(f"/places/{place['id']}/votes")).json()["status"] == "unverified"
+    # Voting again counts, but is not rewarded a second time.
+    assert (await world.vote(expert, place["id"]))["status"] == "preliminary"
+    assert await _reputation(expert) == 202
+    assert (await world.http.delete(f"{API}/places/{place['id']}/votes")).status_code == 401

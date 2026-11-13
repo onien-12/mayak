@@ -7,6 +7,7 @@ import {
   errorMessage,
   notesApi,
   queryKeys,
+  rereadAfterCheck,
   type MapNote,
   type NoteInput,
   type NotesQuery,
@@ -97,6 +98,7 @@ export function useSpotNotes(spot: MapTap) {
       );
       if (tempId !== undefined) setAliases((prev) => new Map(prev).set(note.id, tempId));
       void refreshLayer();
+      rereadAfterCheck([queryKeys.notes.all]);
     },
   });
 

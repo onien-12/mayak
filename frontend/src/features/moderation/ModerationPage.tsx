@@ -9,8 +9,8 @@ import { useModerationSummary } from './useModeration';
 import { useQueueParams, type ModerationTab } from './useQueueParams';
 
 /**
- * Moderation (`/moderation`, moderators only): summary, the queue with filters, quietly held
- * photos / comments / reviews / notes, resolved cases and the decision log. Built to clear a
+ * Moderation (`/moderation`, moderators only): summary, the queue with filters, photos /
+ * comments / reviews / notes held by the automatic check, resolved cases and the decision log. Built to clear a
  * queue quickly, on a phone too.
  */
 export default function ModerationPage() {

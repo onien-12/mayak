@@ -58,7 +58,7 @@ export const QUICK_REASONS: Record<ModerationAction, readonly string[]> = {
   remove: ['Оскорбления', 'Реклама или спам', 'Непристойное фото', 'Личные данные'],
 };
 
-/** Who held an item quietly, in plain words. */
+/** Why the automatic check held an item, in plain words (moderators only). */
 export const HOLD_SOURCE_LABELS: Record<HoldSource, string> = {
   heuristic: 'Набор случайных букв',
   ai: 'Проверка ИИ',

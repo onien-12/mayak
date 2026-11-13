@@ -5,7 +5,7 @@ from app.models.area import Area
 from app.models.base import Base
 from app.models.catalog import Category
 from app.models.collection import Collection, CollectionItem
-from app.models.enrichment import ExternalLink, TextCredit
+from app.models.enrichment import AppliedSnapshot, ExternalLink, TextCredit
 from app.models.event import EventDetails, EventParticipant
 from app.models.external_rating import ExternalRatingCache
 from app.models.feedback import Comment, Review
@@ -24,6 +24,7 @@ from app.models.verification import Vote
 
 __all__ = [
     "AiReview",
+    "AppliedSnapshot",
     "Area",
     "AuthorStanding",
     "Base",

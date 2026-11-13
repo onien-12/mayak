@@ -146,8 +146,9 @@ function HeldCard({
 }
 
 /**
- * «Удержано»: photos, comments, reviews and notes held quietly on their own (SPEC §24.1).
- * Their authors see them as published; a moderator either releases or removes them.
+ * «Удержано»: photos, comments, reviews and notes held by the automatic check on their own
+ * (SPEC §24.1). Their authors see them marked «на проверке» and were told why; a moderator
+ * either releases or removes them, and the author hears which.
  */
 export function HeldList() {
   const [kind, setKind] = useState<HeldKind | undefined>(undefined);
@@ -164,8 +165,9 @@ export function HeldList() {
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm text-ink-soft">
-        Автор видит удержанное как опубликованное и не узнает о проверке, пока вы не уберёте
-        элемент.
+        Автору сообщили, что элемент не прошёл автоматическую проверку, и он видит его с пометкой
+        «На проверке». Другим он не виден. «Выпустить» опубликует его, «Убрать» — скроет; автор
+        получит уведомление в обоих случаях.
       </p>
       <div className="-mx-4 no-scrollbar flex gap-2 overflow-x-auto px-4 lg:mx-0 lg:px-0">
         <Chip selected={kind === undefined} onClick={() => setKind(undefined)}>

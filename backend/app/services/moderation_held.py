@@ -1,8 +1,11 @@
 """Held photos, comments, reviews and notes (SPEC §24.1): a list apart from the case queue.
 
 Each held item has a moderation case of its own (opened by the hold), so every decision goes
-to the same immutable log. Two outcomes only: release (show it after all) or remove.
+to the same immutable log. Two outcomes only: release (show it after all) or remove; either way
+the author, who was told about the hold, hears how it ended.
 """
+
+from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -37,6 +40,12 @@ _MODELS: dict[AiTarget, type[Comment | Review | MapNote | Photo]] = {
     AiTarget.COMMENT: Comment,
     AiTarget.REVIEW: Review,
     AiTarget.NOTE: MapNote,
+}
+_RELEASED_TITLES: dict[AiTarget, str] = {
+    AiTarget.PHOTO: "Ваше фото проверено и опубликовано",
+    AiTarget.COMMENT: "Ваш комментарий проверен и опубликован",
+    AiTarget.REVIEW: "Ваш отзыв проверен и опубликован",
+    AiTarget.NOTE: "Ваша заметка проверена и опубликована",
 }
 _REMOVED_TITLES: dict[AiTarget, str] = {
     AiTarget.PHOTO: "Ваше фото убрано модератором",
@@ -143,11 +152,12 @@ async def _held(session: AsyncSession, hold_id: int) -> tuple[QuietHold, Moderat
 
 
 async def release(session: AsyncSession, moderator: User, hold_id: int, reason: str) -> None:
-    """The check was wrong: show the item as if it had passed; nothing tells its author."""
+    """The check was wrong: show the item as if it had passed and tell its author."""
     now = utcnow()
     hold, case = await _held(session, hold_id)
     moderation.log_decision(session, case, moderator, ModerationAction.RELEASE, reason, now)
     await screening.release(session, hold, now, by_moderator=True)
+    _tell_author(session, hold, moderator, _RELEASED_TITLES, reason, await _link(session, hold), now)
     await session.commit()
 
 
@@ -160,23 +170,32 @@ async def remove(session: AsyncSession, moderator: User, hold_id: int, reason: s
     link = await _link(session, hold)
     if hold.target_type is AiTarget.PHOTO:
         await screening.detach_photo(session, hold.target_id, now)
+    _tell_author(session, hold, moderator, _REMOVED_TITLES, reason, link, now)
+    await session.commit()
+
+
+def _tell_author(
+    session: AsyncSession,
+    hold: QuietHold,
+    moderator: User,
+    titles: dict[AiTarget, str],
+    reason: str,
+    link: str | None,
+    now: datetime,
+) -> None:
     if hold.author_id != moderator.id:
         notifications.notify(
             session,
             user_id=hold.author_id,
             kind=NotificationKind.MODERATION,
-            title=_REMOVED_TITLES[hold.target_type],
+            title=titles[hold.target_type],
             body=reason,
             link=link,
             now=now,
         )
-    await session.commit()
 
 
 async def _link(session: AsyncSession, hold: QuietHold) -> str | None:
-    fields = await _item_fields(session, hold) or {}
-    if (place := fields.get("place")) is not None:
-        return notifications.place_link(place.id)
-    if (route := fields.get("route")) is not None:
-        return notifications.route_link(route.id)
-    return None
+    """Read before a removed photo comes off its place."""
+    found = await screening.owner(session, hold)
+    return found.link if found is not None else None

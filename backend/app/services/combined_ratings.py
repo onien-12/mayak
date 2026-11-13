@@ -5,7 +5,6 @@ Served while the external reviews are enabled; the API binds that per request to
 """
 
 from collections.abc import Sequence
-from datetime import datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,8 +14,7 @@ from app.domain.areas import COUNTED_LAYERS
 from app.domain.combined_rating import OWN_SOURCE, RatingPart
 from app.domain.enums import PUBLIC_STATUSES
 from app.models import Area, Place
-from app.schemas.place import CombinedRating, PlaceCard
-from app.services import mappers
+from app.schemas.place import CombinedRating
 from app.services.experimental.external_reviews import ratings
 
 _ENABLED = "combined_ratings_enabled"
@@ -26,7 +24,9 @@ def enable(session: AsyncSession, enabled: bool) -> None:
     session.info[_ENABLED] = enabled
 
 
-def _enabled(session: AsyncSession) -> bool:
+def enabled(session: AsyncSession) -> bool:
+    """The external sources (SPEC §20) are served on this session: their ratings, and the covers
+    borrowed from their photos (`covers`)."""
     return bool(session.info.get(_ENABLED, False))
 
 
@@ -41,7 +41,7 @@ def _blend(own: RatingPart | None, external: list[RatingPart]) -> CombinedRating
 
 async def for_places(session: AsyncSession, places: Sequence[Place]) -> dict[int, CombinedRating]:
     """Requires `place.area` loaded; places without a blend are left out."""
-    if not places or not _enabled(session):
+    if not places or not enabled(session):
         return {}
     external = await ratings.for_places(session, places)
     blends = {
@@ -72,7 +72,7 @@ async def _ratings_inside(session: AsyncSession, area_ids: Sequence[int]) -> dic
 
 
 async def for_areas(session: AsyncSession, areas: Sequence[Area]) -> dict[int, CombinedRating]:
-    if not areas or not _enabled(session):
+    if not areas or not enabled(session):
         return {}
     external = await ratings.for_areas(session, areas)
     rated = [area for area in areas if external.get(area.id)]
@@ -81,9 +81,3 @@ async def for_areas(session: AsyncSession, areas: Sequence[Area]) -> dict[int, C
         area.id: _blend(_own(area.rating_avg, counts.get(area.id)), external[area.id]) for area in rated
     }
     return {identifier: blend for identifier, blend in blends.items() if blend is not None}
-
-
-async def place_cards(session: AsyncSession, places: Sequence[Place], now: datetime) -> list[PlaceCard]:
-    """`mappers.place_card` for a page of places, with their blends loaded in one go."""
-    blends = await for_places(session, places)
-    return [mappers.place_card(place, now, combined_rating=blends.get(place.id)) for place in places]

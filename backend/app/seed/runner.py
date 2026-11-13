@@ -66,6 +66,7 @@ from app.services.vlru import outages_importer
 from app.services.vlru.outages_importer import Outage
 from app.services.wikimedia import apply as wikimedia_apply
 from app.services.wikimedia import snapshot as wikimedia_snapshot
+from app.services.wikimedia.apply import WikimediaReport
 from app.services.wikivoyage import importer as wikivoyage_importer
 from app.services.wikivoyage import snapshot as wikivoyage_snapshot
 
@@ -546,12 +547,27 @@ async def _seed_wikivoyage(ctx: SeedContext) -> None:
 
 async def _seed_wikimedia(ctx: SeedContext) -> None:
     """Freely licensed photos and Wikipedia summaries from the committed snapshot (SPEC §19)."""
-    keyed = await enrichment.keyed_objects(ctx.session)
-    seeded = await seed_objects(ctx.session)
+    report = await apply_wikimedia(ctx.session, ctx.now)
+    if report is not None:
+        logger.info("Wikimedia: %s", report.summary())
+
+
+async def apply_wikimedia(
+    session: AsyncSession, now: datetime, *, always: bool = False, path: Path = WIKIMEDIA_SNAPSHOT_FILE
+) -> WikimediaReport | None:
+    """Apply the committed Wikimedia snapshot once per version of the file (SPEC §19): on a fresh
+    database while seeding, on an existing one at the first start-up after a new snapshot is
+    committed. `always` applies it again (the CLI); the step is idempotent either way. None when
+    there was nothing to apply. Database only — never a request to Wikimedia. Commits nothing."""
+    version = wikimedia_snapshot.version(path)
+    if version is None or (not always and await wikimedia_apply.applied_version(session) == version):
+        return None
+    keyed = await enrichment.keyed_objects(session)
+    seeded = await seed_objects(session)
     keyed.merge(seeded.places, seeded.areas)
-    harvest = wikimedia_snapshot.read(WIKIMEDIA_SNAPSHOT_FILE)
-    report = await wikimedia_apply.apply_snapshot(ctx.session, harvest, keyed, ctx.now)
-    logger.info("Wikimedia: %s", report.summary())
+    report = await wikimedia_apply.apply_snapshot(session, wikimedia_snapshot.read(path), keyed, now)
+    await wikimedia_apply.mark_applied(session, version, now)
+    return report
 
 
 async def _seed_social(ctx: SeedContext) -> None:

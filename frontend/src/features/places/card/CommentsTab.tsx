@@ -3,12 +3,19 @@ import { MessagesSquare, SendHorizontal, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 import { requireAuth } from '@/features/auth';
-import { errorMessage, placesApi, queryKeys, type PlaceDetail } from '@/shared/api';
+import {
+  errorMessage,
+  placesApi,
+  queryKeys,
+  rereadAfterCheck,
+  type PlaceDetail,
+} from '@/shared/api';
 import { formatRelative } from '@/shared/lib/format';
 import {
   EmptyState,
   ErrorState,
   IconButton,
+  OnReviewMark,
   Skeleton,
   Textarea,
   toast,
@@ -33,6 +40,7 @@ export function CommentsTab({ place }: { place: PlaceDetail }) {
     onSuccess: () => {
       setText('');
       refresh();
+      rereadAfterCheck([key, queryKeys.places.detail(place.id)]);
     },
     onError: (error) => toast.error(errorMessage(error)),
   });
@@ -77,6 +85,7 @@ export function CommentsTab({ place }: { place: PlaceDetail }) {
                 )}
               </div>
               <p className="mt-2 text-sm whitespace-pre-line text-ink">{comment.text}</p>
+              {comment.on_review && <OnReviewMark className="mt-2" />}
             </li>
           ))}
         </ul>

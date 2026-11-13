@@ -3,13 +3,16 @@
 The observed anonymous feed is limited to five reviews. We never paginate it or claim it is
 the complete review history. For some places it is empty although the search shows a rating and
 a count: such a place is still ours, with the rating and without texts. Cookies come only
-from Google's ordinary public responses.
+from Google's ordinary public responses. Photos come with the same two answers (verified
+2026-11-13): the place's main photo in the search result and the photos visitors attached to the
+previewed reviews — never a reviewer's avatar.
 """
 
 from __future__ import annotations
 
 import json
 import re
+from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlencode
 
@@ -28,6 +31,13 @@ SEARCH_URL = "https://www.google.com/search"
 RPC_URL = "https://www.google.com/maps/_/MapsWizUi/data/batchexecute"
 RPC_ID = "qv9Egd"
 _FID = re.compile(r"0x[0-9a-f]{1,16}:0x[0-9a-f]{1,16}\Z")
+_PHOTO = re.compile(
+    r"(https://lh[0-9]\.googleusercontent\.com/(?!a/|a-/)[A-Za-z0-9_/-]{10,800})(?:=[\w-]*)?\Z"
+)
+"""A place photo of Google's image host (not an account avatar under `/a/`), with or without
+its size options."""
+PHOTO_SIZE = "=w1280-k-no"
+"""The size options asked of the image host: 1280 px wide (the answers' own ask for 512 or less)."""
 
 
 def _at(value: Any, *path: int) -> Any:
@@ -36,6 +46,12 @@ def _at(value: Any, *path: int) -> Any:
             return None
         value = value[index]
     return value
+
+
+def photo_url(raw: Any) -> str | None:
+    """The photo at its viewer size, or None for anything but a place photo of Google's host."""
+    match = _PHOTO.match(raw) if isinstance(raw, str) else None
+    return match.group(1) + PHOTO_SIZE if match else None
 
 
 def search_url(target: Target) -> str:
@@ -81,6 +97,7 @@ def parse_search(text: str) -> list[Organization]:
             raise UnexpectedPageError("invalid Google organisation position")
         rating = parser._number(_at(node, 4, 7))
         count = parser._count(_at(node, 4, 8))
+        main_photo = photo_url(_at(node, 37, 0, 0, 6, 0))
         found.append(
             Organization(
                 identifier,
@@ -90,7 +107,7 @@ def parse_search(text: str) -> list[Organization]:
                 rating if rating is not None and 0 < rating <= 5 else None,
                 None,
                 count,
-                (),
+                (main_photo,) if main_photo else (),
             )
         )
     return found
@@ -160,6 +177,7 @@ def parse_reviews(text: str, organization: Organization) -> FetchedReviews:
     if not isinstance(entries, list):
         raise UnexpectedPageError("malformed Google review preview")
     reviews = []
+    photos = list(organization.photos)
     seen = set()
     low_id = int(organization.org_id.split(":")[1], 16)
     for entry in entries:
@@ -180,11 +198,16 @@ def parse_reviews(text: str, organization: Organization) -> FetchedReviews:
         if not text or identifier in seen:
             continue
         seen.add(identifier)
+        attached = _at(raw, 2, 2)
+        for photo in attached if isinstance(attached, list) else ():
+            if (url := photo_url(_at(photo, 1, 6, 0))) is not None:
+                photos.append(url)
         rating = parser._count(_at(raw, 2, 0, 0))
         # Relative date strings cannot safely become a precise publication timestamp.
         reviews.append(Review(rating if rating is not None and 1 <= rating <= 5 else None, text, None))
     if entries and not reviews and organization.reviews_count:
         raise UnexpectedPageError("Google returned ratings without review texts")
+    organization = replace(organization, photos=tuple(dict.fromkeys(photos))[: parser.MAX_PHOTOS])
     return FetchedReviews(
         organization, reviews[: parser.MAX_REVIEWS], f"https://www.google.com/maps?cid={low_id}"
     )

@@ -75,7 +75,7 @@ export function CaseRow({ item, filters }: CaseRowProps) {
           })}
           {item.quiet && item.state === 'open' && (
             <Badge tone="warning" icon={EyeOff} variant="outline">
-              Тихое удержание
+              Не прошло автопроверку
             </Badge>
           )}
           <AiVerdictChip verdict={item.ai_verdict} />

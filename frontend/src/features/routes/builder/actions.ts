@@ -20,7 +20,7 @@ export function removeWithUndo(id: string): void {
   const store = useBuilderStore.getState();
   const removed = store.removeStop(id);
   if (!removed) return;
-  toast.info(isVia(removed.stop) ? 'Точка трека удалена' : 'Точка удалена', {
+  toast.info(isVia(removed.stop) ? 'Промежуточная точка удалена' : 'Точка удалена', {
     label: 'Вернуть',
     onClick: () => useBuilderStore.getState().restoreStop(removed.stop, removed.index),
   });

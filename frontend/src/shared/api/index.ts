@@ -2,6 +2,7 @@ export * from './types';
 export { api, ApiError, configureApiAuth, errorMessage } from './client';
 export { queryKeys } from './queryKeys';
 export { queryClient } from './queryClient';
+export { rereadAfterCheck } from './screening';
 export { authApi } from './auth';
 export { usersApi } from './users';
 export { catalogApi } from './catalog';

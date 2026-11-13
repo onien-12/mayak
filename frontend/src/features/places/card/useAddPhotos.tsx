@@ -2,7 +2,14 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRef } from 'react';
 
 import { requireAuth } from '@/features/auth';
-import { errorMessage, placesApi, UPLOAD_ACCEPT, type PlaceDetail } from '@/shared/api';
+import {
+  errorMessage,
+  placesApi,
+  queryKeys,
+  rereadAfterCheck,
+  UPLOAD_ACCEPT,
+  type PlaceDetail,
+} from '@/shared/api';
 import { toast } from '@/shared/ui';
 
 import { usePhotoUpload } from './usePhotoUpload';
@@ -22,6 +29,7 @@ export function useAddPhotos(place: PlaceDetail) {
     mutationFn: (photoIds: number[]) => placesApi.addPhotos(place.id, photoIds),
     onSuccess: (updated) => {
       syncPlace(queryClient, updated);
+      rereadAfterCheck([queryKeys.places.detail(place.id)]);
       toast.success('Фото добавлены');
     },
     onError: (error) => toast.error(errorMessage(error)),

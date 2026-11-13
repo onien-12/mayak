@@ -12,11 +12,15 @@ from urllib.parse import quote
 from selectolax.lexbor import LexborHTMLParser
 
 from app.domain import free_text
+from app.domain.archive_photos import Tie
 
 ALLOWED_MIME = frozenset({"image/jpeg", "image/png"})
 MIN_SIDE_PX = 600
 MAX_AUTHOR_LENGTH = 200
 MAX_LICENSE_LENGTH = 60
+MAX_DESCRIPTION_LENGTH = 300
+MAX_CATEGORIES = 20
+MAX_CATEGORY_LENGTH = 120
 FREE_LICENSE = re.compile(r"^(cc[ -]by|cc0|public domain|pd\b|attribution|gfdl|fal\b)", re.IGNORECASE)
 IRRELEVANT_TITLE = re.compile(
     r"(\bmap\b|карта|схема|\bplan\b|план |logo|логотип|\bflag\b|флаг|coat of arms|герб|diagram|"
@@ -45,6 +49,16 @@ class CommonsPhoto:
     """The file's description page on Commons."""
     lat: float | None = None
     lng: float | None = None
+    description: str = ""
+    """The file's description, plain text, at most 300 characters — what the photo shows."""
+    categories: tuple[str, ...] = ()
+    """The file's Commons categories (without the `Category:` prefix)."""
+    tie: str | None = None
+    """How the photo was found for its target (`archive_photos.Tie`); None in older snapshots."""
+
+    def texts(self) -> tuple[str, ...]:
+        """What may name the object it shows: the file's title, description and categories."""
+        return (self.file, self.description, *self.categories)
 
 
 def plain_text(html: str, limit: int) -> str:
@@ -91,6 +105,9 @@ def make_photo(
     source_url: Any,
     lat: float | None = None,
     lng: float | None = None,
+    description: Any = "",
+    categories: Any = (),
+    tie: Any = None,
 ) -> CommonsPhoto | None:
     """A photo whose every field is safe to show; None when it is not free, not https or irrelevant.
 
@@ -111,6 +128,12 @@ def make_photo(
     ):
         return None
     author_text = plain_text(author, MAX_AUTHOR_LENGTH) if isinstance(author, str) else ""
+    raw_categories = categories.split("|") if isinstance(categories, str) else categories
+    category_names = tuple(
+        plain_text(name, MAX_CATEGORY_LENGTH)
+        for name in (raw_categories if isinstance(raw_categories, list | tuple) else ())[:MAX_CATEGORIES]
+        if isinstance(name, str) and name.strip()
+    )
     return CommonsPhoto(
         file=file,
         url=url,
@@ -121,6 +144,9 @@ def make_photo(
         source_url=source_url,
         lat=lat,
         lng=lng,
+        description=plain_text(description, MAX_DESCRIPTION_LENGTH) if isinstance(description, str) else "",
+        categories=category_names,
+        tie=tie if tie in set(Tie) else None,
     )
 
 
@@ -143,6 +169,8 @@ def photo_from_page(page: Any) -> CommonsPhoto | None:
         source_url=info.get("descriptionurl"),
         lat=lat,
         lng=lng,
+        description=_meta(info, "ImageDescription"),
+        categories=_meta(info, "Categories"),
     )
 
 

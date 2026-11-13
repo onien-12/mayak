@@ -54,6 +54,7 @@ from app.services import (
     place_details,
     place_queries,
     quiet_holds,
+    screening,
     uploads,
 )
 from app.services.external_ratings import RatingRefresher
@@ -147,7 +148,8 @@ async def list_history(session: AsyncSession, place_id: int, viewer: User | None
 
 def _visibility_clause(filters: PlaceFilters, viewer: User | None) -> object:
     """Public places of the requested statuses; the viewer's own submissions waiting for
-    pre-moderation on the default map, and their quietly held places as they see them."""
+    pre-moderation (or held by the screening) on the default map, and their places in a
+    screening window as they see them."""
     listed = place_queries.listed_clause(viewer, _STATUSES_BY_MIN[filters.min_status])
     if viewer is None or filters.min_status is not MinStatus.ANY:
         return listed
@@ -660,16 +662,17 @@ async def _rescreen(
     if not text_flags and not photo_flags:
         return
     seen = await place_queries.shown_status(session, place)
-    if seen in PUBLIC_STATUSES:
-        history.record(
-            session,
-            place,
-            HistoryKind.STATUS_CHANGED,
-            "Публикация отправлена на проверку автоматическим фильтром",
-            now=now,
-            old_status=seen,
-            new_status=PlaceStatus.PENDING,
-        )
+    if await place_queries.intended_status(session, place) in PUBLIC_STATUSES:
+        if seen in PUBLIC_STATUSES:
+            history.record(
+                session,
+                place,
+                HistoryKind.STATUS_CHANGED,
+                screening.HOLD_HISTORY_MESSAGE,
+                now=now,
+                old_status=seen,
+                new_status=PlaceStatus.PENDING,
+            )
         place.status = PlaceStatus.PENDING
         hold = await quiet_holds.find_active(session, AiTarget.PLACE, place.id)
         if hold is not None:
@@ -685,11 +688,11 @@ async def _rescreen(
 
 
 async def _sync_moderation_queue(
-    session: AsyncSession, place: Place, actor: User, seen: PlaceStatus, now: datetime
+    session: AsyncSession, place: Place, actor: User, intended: PlaceStatus, now: datetime
 ) -> None:
-    """An author's edit of a place they see waiting for pre-moderation re-queues it; an open
-    case follows the new title."""
-    if seen is PlaceStatus.PENDING and actor.id == place.author_id:
+    """An author's edit of a place waiting for pre-moderation re-queues it (a held one is
+    before a moderator already); an open case follows the new title."""
+    if intended is PlaceStatus.PENDING and actor.id == place.author_id:
         await moderation_cases.open_case(
             session, moderation_cases.place_target(place), ModerationTrigger.PREMODERATION, now=now
         )
@@ -704,7 +707,7 @@ async def _screen_edit(
     actor: User,
     changed: list[str],
     new_photos: list[Photo],
-    seen: PlaceStatus,
+    intended: PlaceStatus,
     now: datetime,
 ) -> None:
     """The author's new words open a screening window; new photos are checked with the place
@@ -714,7 +717,7 @@ async def _screen_edit(
         return
     reopens = bool(_WINDOW_LABELS.intersection(changed)) and place.status is not PlaceStatus.HIDDEN
     if reopens:
-        await _open_place_window(session, place, actor, shown=seen, now=now, announce=False)
+        await _open_place_window(session, place, actor, shown=intended, now=now, announce=False)
     parent = (AiTarget.PLACE, place.id) if reopens else None
     await uploads.open_photo_windows(session, actor, new_photos, now, parent=parent)
 
@@ -761,11 +764,11 @@ async def update_place(
         )
         if _SCREENED_LABELS.intersection(changed):
             await _rescreen(session, place, actor, new_photos, now)
-        seen = await place_queries.shown_status(session, place)
-        await _screen_edit(session, place, actor, changed, new_photos, seen, now)
+        intended = await place_queries.intended_status(session, place)
+        await _screen_edit(session, place, actor, changed, new_photos, intended, now)
         if new_photos:
             await uploads.refresh_cover(session, place)
-        await _sync_moderation_queue(session, place, actor, seen, now)
+        await _sync_moderation_queue(session, place, actor, intended, now)
         await session.flush()
         for area_id in {previous_area_id, place.area_id}:
             await areas.refresh_area(session, area_id, now)

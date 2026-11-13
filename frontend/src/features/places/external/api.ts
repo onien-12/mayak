@@ -114,12 +114,17 @@ export const fetchMoreReviews = (target: ExternalReviewsTarget, source: ReviewSo
     source,
   });
 
-/** Every source's hot-linked photos, each credited to its service. */
+/** The services in the order a borrowed cover takes them (SPEC §25): main photos first. */
+const PHOTO_ORDER: readonly ReviewSourceName[] = ['yandex', 'google', '2gis'];
+
+/** Every source's hot-linked photos, each credited to its service; the cover's source first. */
 export function sourcePhotos(reviews: ExternalReviews | undefined): ViewerPhoto[] {
   if (!reviews?.enabled) return [];
-  return reviews.sources.flatMap(({ photos, label, url }) =>
-    photos.map((photo) => ({ url: photo, source: { label, url } })),
-  );
+  return [...reviews.sources]
+    .sort((a, b) => PHOTO_ORDER.indexOf(a.source) - PHOTO_ORDER.indexOf(b.source))
+    .flatMap(({ photos, label, url }) =>
+      photos.map((photo) => ({ url: photo, source: { label, url } })),
+    );
 }
 
 /** Sights and named facilities exist as organisations at the source; the server has the final say. */

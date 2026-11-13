@@ -11,6 +11,8 @@ import type {
 import { fromLocalInputValue, toLocalInputValue } from '@/shared/lib/format';
 import type { LatLng } from '@/shared/lib/geo';
 
+import { isRelevantFact } from '../attributeRules';
+
 /** Raw form state: numbers stay strings until submit, booleans may be "not specified" (`null`). */
 export interface PlaceFormValues {
   title: string;
@@ -54,7 +56,8 @@ function defaultEvent(preset: { isMeetup?: boolean }): PlaceFormValues['event'] 
   return {
     starts_at: toLocalInputValue(start),
     ends_at: toLocalInputValue(new Date(start.getTime() + 2 * HOUR_MS)),
-    is_meetup: preset.isMeetup ?? false,
+    // Most of what residents arrange is a small meetup; a city-scale event switches it off.
+    is_meetup: preset.isMeetup ?? true,
     capacity: '',
     price: '',
     age_limit: '',
@@ -117,6 +120,7 @@ function toAttributes(values: PlaceFormValues, category: Category): Attributes {
   for (const field of category.fields) {
     const raw = values.attributes[field.key];
     if (raw === null || raw === undefined || raw === '') continue;
+    if (!isRelevantFact(field.key, values.attributes)) continue;
     if (field.type === 'number') {
       const number = Number(raw);
       if (Number.isFinite(number)) attributes[field.key] = number;

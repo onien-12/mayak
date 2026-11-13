@@ -20,7 +20,7 @@ export interface NavItem {
 
 export const PRIMARY_NAV: readonly NavItem[] = [
   { to: '/', label: 'Карта', icon: MapIcon, match: [] },
-  { to: '/events', label: 'Афиша', icon: CalendarDays, match: ['/events'] },
+  { to: '/events', label: 'События', icon: CalendarDays, match: ['/events'] },
   { to: '/routes', label: 'Маршруты', icon: Route, match: ['/routes'] },
   { to: '/saved', label: 'Избранное', icon: Heart, match: ['/saved', '/collections'] },
 ];

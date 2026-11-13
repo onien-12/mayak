@@ -135,6 +135,15 @@ async def visible_place_photos(session: AsyncSession, place_id: int, viewer: Use
     ]
 
 
+async def photos_out(session: AsyncSession, photos: list[Photo], viewer: User | None) -> list[PhotoOut]:
+    """Photos for the viewer, their own ones that did not pass the screening marked."""
+    own = [photo.id for photo in photos if viewer is not None and photo.uploader_id == viewer.id]
+    held = await quiet_holds.held_ids(session, AiTarget.PHOTO, own)
+    return [
+        PhotoOut.model_validate(photo).model_copy(update={"on_review": photo.id in held}) for photo in photos
+    ]
+
+
 async def _held_on_their_own(session: AsyncSession, photos: list[Photo]) -> set[int]:
     """Photos in an active hold of their own: added to a place that is otherwise fine. Photos
     screened together with their place need no exclusion, the place itself is hidden."""

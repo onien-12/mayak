@@ -1,13 +1,10 @@
 import { CircleDashed, History } from 'lucide-react';
 
-import type { PlaceDetail, VoteKind } from '@/shared/api';
-import { cn } from '@/shared/lib/cn';
+import type { PlaceDetail } from '@/shared/api';
 import { formatDate, formatRelative } from '@/shared/lib/format';
-import { EXTERNAL_SOURCE_META, STATUS_META, VOTE_KINDS, voteMeta } from '@/shared/lib/labels';
+import { EXTERNAL_SOURCE_META, STATUS_META } from '@/shared/lib/labels';
 import { isUnconfirmedImport } from '@/shared/lib/imports';
-import { TONES } from '@/shared/lib/tones';
 import {
-  AnimatedNumber,
   Badge,
   Banner,
   ExternalBadge,
@@ -17,25 +14,10 @@ import {
   UserChip,
 } from '@/shared/ui';
 
-function VoteCount({ place, kind }: { place: PlaceDetail; kind: VoteKind }) {
-  const meta = voteMeta(place.layer)[kind];
-  const Icon = meta.icon;
-  return (
-    <div className="flex flex-1 flex-col items-center rounded-control bg-canvas px-1 py-2">
-      <span
-        className={cn('flex items-center gap-1 text-base font-semibold', TONES[meta.tone].text)}
-      >
-        <Icon size={15} aria-hidden />
-        <AnimatedNumber value={place.verification[kind]} />
-      </span>
-      <span className="mt-0.5 text-center text-2xs leading-tight text-ink-soft">{meta.label}</span>
-    </div>
-  );
-}
-
 /**
- * How much the publication can be trusted: status, 0–100 meter, vote counts, freshness
- * and — separately — who added it (author reputation is not publication status).
+ * How much the publication can be trusted: status, 0–100 meter, freshness and — separately —
+ * who added it (author reputation is not publication status). The vote counts are on the
+ * vote buttons of `VerificationBlock`.
  */
 export function TrustBlock({ place }: { place: PlaceDetail }) {
   const status = STATUS_META[place.status];
@@ -67,11 +49,6 @@ export function TrustBlock({ place }: { place: PlaceDetail }) {
           : `${status.description}.`}
       </p>
       <TrustMeter score={place.trust_score} className="mt-3" />
-      <div className="mt-3 flex gap-1.5">
-        {VOTE_KINDS.map((kind) => (
-          <VoteCount key={kind} place={place} kind={kind} />
-        ))}
-      </div>
       {place.is_stale && (
         <Banner tone="warning" icon={History} title="Давно не проверялось" className="mt-3">
           Последнее подтверждение было больше полугода назад. Если вы рядом — отметьте, актуально ли

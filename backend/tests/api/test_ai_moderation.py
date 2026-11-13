@@ -110,23 +110,16 @@ async def test_the_window_hides_a_place_until_the_check_passes(world: World, cli
 async def test_the_prompt_carries_the_text_as_data_without_personal_data(world: World) -> None:
     newcomer = await world.actor("newcomer")
     moderator = await world.actor("moderator", role=UserRole.MODERATOR)
-    unreviewed = await world.create_place(newcomer)
     fake = world.enable_ai()
     reviewed = await world.create_place(
         newcomer, description="Чистый туалет у парка.", tags=["парк"], address="Светланская ул., 33"
     )
     await world.ai_done()
 
-    assert (await newcomer.get(f"/places/{reviewed['id']}")).json()["status"] == "pending"
-    cases = {case["target_id"]: case for case in await _queue(moderator)}
-    assert cases[reviewed["id"]]["risk"] < cases[unreviewed["id"]]["risk"]
-    assert (cases[reviewed["id"]]["ai_verdict"], cases[unreviewed["id"]]["ai_verdict"]) == ("ok", None)
-    assert cases[reviewed["id"]]["triggers"] == ["premoderation"]
-    assert cases[reviewed["id"]]["quiet"] is False
-    detail = (await moderator.get(f"/moderation/cases/{cases[reviewed['id']]['id']}")).json()
-    assert detail["ai_review"]["verdict"] == "ok"
-    assert detail["ai_review"]["model"] == "deepseek/deepseek-v4.1-flash"
-    assert (detail["usefulness"], detail["author_standing"]) == (60, 52)
+    # A newcomer's place that passes the check is published without a moderator.
+    assert (await newcomer.get(f"/places/{reviewed['id']}")).json()["status"] == "unverified"
+    assert await _queue(moderator) == []
+    assert await _standing(world, newcomer) == 51
 
     system_prompt, content = fake.calls[0]
     assert "<user_content>" in system_prompt
@@ -169,11 +162,16 @@ async def test_doubt_below_the_threshold_is_shown_with_a_warning(world: World, c
 
 
 @pytest.mark.parametrize(
-    ("verdict", "confidence", "usefulness"),
-    [("suspicious", 0.6, 60), ("violation", 0.3, 60), ("violation", 0.99, 60), ("ok", 0.9, 14)],
+    ("verdict", "confidence", "usefulness", "told"),
+    [
+        ("suspicious", 0.6, 60, "Текст: спам"),
+        ("violation", 0.3, 60, "Текст: спам"),
+        ("violation", 0.99, 60, "Текст: спам"),
+        ("ok", 0.9, 14, "Текст: слишком мало сведений о месте"),
+    ],
 )
-async def test_what_turns_a_window_into_a_quiet_hold(
-    world: World, client: AsyncClient, verdict: str, confidence: float, usefulness: int
+async def test_what_turns_a_window_into_a_hold(
+    world: World, client: AsyncClient, verdict: str, confidence: float, usefulness: int, told: str
 ) -> None:
     author = await world.actor("author", reputation=20)
     moderator = await world.actor("moderator", role=UserRole.MODERATOR)
@@ -183,7 +181,8 @@ async def test_what_turns_a_window_into_a_quiet_hold(
     await world.ai_done()
 
     assert (await client.get(f"{API}/places/{place['id']}")).status_code == 404
-    assert (await author.get(f"/places/{place['id']}")).json()["status"] == "unverified"
+    seen = (await author.get(f"/places/{place['id']}")).json()
+    assert (seen["status"], seen["screening_hold"]) == ("pending", {"reasons": [told]})
     case = (await _queue(moderator))[0]
     assert (case["target_id"], case["triggers"], case["quiet"]) == (place["id"], ["auto_ai"], True)
     detail = (await moderator.get(f"/moderation/cases/{case['id']}")).json()
@@ -212,7 +211,9 @@ async def test_photos_are_checked_one_by_one_and_hold_their_place(world: World, 
 
     assert (await client.get(f"{API}/places/{place['id']}")).status_code == 404
     seen = (await author.get(f"/places/{place['id']}")).json()
-    assert ([photo["id"] for photo in seen["photos"]], seen["status"]) == ([fine, banner], "unverified")
+    assert ([photo["id"] for photo in seen["photos"]], seen["status"]) == ([fine, banner], "pending")
+    assert [photo["on_review"] for photo in seen["photos"]] == [False, True]
+    assert seen["screening_hold"] == {"reasons": ["Фото 2: реклама"]}
     case = (await _queue(moderator))[0]
     assert (case["triggers"], case["quiet"]) == (["auto_image"], True)
     detail = (await moderator.get(f"/moderation/cases/{case['id']}")).json()
@@ -261,6 +262,13 @@ async def test_gibberish_is_held_at_once_without_the_model(world: World, client:
     )
     mashed = await world.create_place(without_model, title="Туалет", description="фывапролдж")
     assert (await client.get(f"{API}/places/{mashed['id']}")).status_code == 404
+    seen = (await without_model.get(f"/places/{mashed['id']}")).json()
+    assert (seen["status"], seen["screening_hold"]) == (
+        "pending",
+        {"reasons": ["Похоже на случайный набор букв: описание"]},
+    )
+    [notice] = (await without_model.get("/notifications")).json()
+    assert notice["title"] == "Публикация «Туалет» не прошла автоматическую проверку"
 
 
 async def test_a_mashed_address_is_refused_openly(world: World) -> None:
@@ -369,7 +377,7 @@ async def test_moderators_and_imports_are_never_screened(world: World) -> None:
     assert await _hold(world, AiTarget.PLACE, place["id"]) is None
 
 
-async def test_private_routes_are_never_sent_public_ones_are_held_quietly(world: World) -> None:
+async def test_private_routes_are_never_sent_public_ones_are_held(world: World) -> None:
     author = await world.actor("author", reputation=20)
     moderator = await world.actor("moderator", role=UserRole.MODERATOR)
     fake = world.enable_ai()
@@ -388,9 +396,10 @@ async def test_private_routes_are_never_sent_public_ones_are_held_quietly(world:
     submission = _submission(fake)
     assert submission["kind"] == "route"
     assert submission["stops"][1]["note"] == "Секретное место"
-    assert (await author.get(f"/routes/{public['id']}")).json()["status"] == "published"
-    assert [item["id"] for item in (await author.get(f"/users/{author.id}/routes")).json()] == [public["id"]]
-    assert (await author.get(f"/users/{author.id}")).json()["stats"]["routes"] == 1
+    seen = (await author.get(f"/routes/{public['id']}")).json()
+    assert (seen["status"], seen["screening_hold"]) == ("pending", {"reasons": ["Текст: не по теме"]})
+    assert [item["id"] for item in (await author.get("/me/routes")).json()][:1] == [public["id"]]
+    assert (await author.get(f"/users/{author.id}")).json()["stats"]["routes"] == 0
     assert (await author.get(f"/routes/{private['id']}")).json()["status"] == "published"
     assert (await world.http.get(f"{API}/routes/{public['id']}")).status_code == 404
     assert (await world.http.get(f"{API}/routes")).json() == []
@@ -403,7 +412,10 @@ async def test_private_routes_are_never_sent_public_ones_are_held_quietly(world:
     )
     assert (await world.http.get(f"{API}/routes/{public['id']}")).json()["status"] == "published"
     assert (await author.get("/auth/me")).json()["reputation"] == reputation
-    assert (await author.get("/notifications")).json() == []
+    assert [item["title"] for item in (await author.get("/notifications")).json()] == [
+        "Публикация одобрена модератором",
+        "Маршрут «Мой путь» не прошёл автоматическую проверку",
+    ]
 
 
 @pytest.mark.parametrize("case", CASES["cases"], ids=[case["name"] for case in CASES["cases"]])

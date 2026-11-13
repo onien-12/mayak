@@ -29,6 +29,8 @@ class ReviewOut(_AuthoredText):
     rating: int
     text: str
     created_at: datetime
+    on_review: bool = False
+    """The viewer's own review that did not pass the screening: only they and moderators see it."""
 
 
 class ReviewIn(ApiModel):
@@ -42,6 +44,8 @@ class CommentOut(_AuthoredText):
     text: str
     created_at: datetime
     can_delete: bool
+    on_review: bool = False
+    """The viewer's own comment that did not pass the screening: only they and moderators see it."""
 
 
 class CommentIn(ApiModel):

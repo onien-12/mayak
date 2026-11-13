@@ -2,15 +2,23 @@ import { useState } from 'react';
 
 import { usePlaceParam } from '@/features/map';
 import { externalTarget, ExternalPhotos, useExternalPhotos } from '@/features/places';
-import type { AreaCard, AreaDetail, PhotoCredit, PlaceCard } from '@/shared/api';
+import type { AreaCard, AreaDetail, CoverSource, PhotoCredit, PlaceCard } from '@/shared/api';
 import { cn } from '@/shared/lib/cn';
 import { AREA_KIND_META, interestLabel } from '@/shared/lib/labels';
-import { CreditMark, Lightbox, Pressable, type ViewerPhoto } from '@/shared/ui';
+import { CoverSourceMark, CreditMark, Lightbox, Pressable, type ViewerPhoto } from '@/shared/ui';
 
 const MOSAIC_SIZE = 3;
 
-/** A photo of the territory itself or the cover of a place inside (captioned with the place). */
-type CoverTile = { url: string; credit: PhotoCredit | null; place: PlaceCard | null };
+/**
+ * A photo of the territory itself or the cover of a place inside (captioned with the place);
+ * `source` marks a place's cover borrowed from a map service.
+ */
+type CoverTile = {
+  url: string;
+  credit: PhotoCredit | null;
+  source?: CoverSource | null;
+  place: PlaceCard | null;
+};
 
 /** The area's own photos first, then photos of different places inside, best places first. */
 function coverTiles(area: AreaDetail, places: readonly PlaceCard[]): CoverTile[] {
@@ -22,7 +30,12 @@ function coverTiles(area: AreaDetail, places: readonly PlaceCard[]): CoverTile[]
   for (const place of places) {
     if (!place.cover_url || seen.has(place.cover_url)) continue;
     seen.add(place.cover_url);
-    tiles.push({ url: place.cover_url, credit: place.cover_credit, place });
+    tiles.push({
+      url: place.cover_url,
+      credit: place.cover_credit,
+      source: place.cover_source,
+      place,
+    });
   }
   return tiles;
 }
@@ -99,11 +112,15 @@ function Mosaic({ tiles, onPhoto }: { tiles: CoverTile[]; onPhoto: (index: numbe
               src={tile.url}
               alt=""
               loading={index === 0 ? 'eager' : 'lazy'}
+              referrerPolicy={tile.source ? 'no-referrer' : undefined}
               className="size-full object-cover"
             />
           </button>
           {tile.credit && (
             <CreditMark credit={tile.credit} className="top-1.5 right-1.5 bottom-auto" />
+          )}
+          {!tile.credit && tile.source && (
+            <CoverSourceMark source={tile.source} className="top-1.5 right-1.5 bottom-auto" />
           )}
           {index === shown.length - 1 && more > 0 && (
             <span className="pointer-events-none absolute top-2 right-2 rounded-full bg-ink/60 px-2 py-0.5 text-xs font-medium text-white">
@@ -126,11 +143,23 @@ export function AreaCover({ area, places }: { area: AreaDetail; places: readonly
   const [photoIndex, setPhotoIndex] = useState<number | null>(null);
   const tiles = coverTiles(area, places);
   const kind = AREA_KIND_META[area.kind];
-  const external = useExternalPhotos(externalTarget('area', area), tiles.length === 0);
+  const fresh = useExternalPhotos(externalTarget('area', area), tiles.length === 0);
+  // Without a fresh answer, the cover the server borrowed for the area (SPEC §25) stands in.
+  const borrowed: ViewerPhoto[] =
+    area.cover_url && area.cover_source
+      ? [
+          {
+            url: area.cover_url,
+            source: { label: area.cover_source.label, url: area.cover_source.url },
+          },
+        ]
+      : [];
+  const external = fresh.length > 0 ? fresh : borrowed;
   const fallback = tiles.length === 0 && external.length > 0;
-  const viewer: ViewerPhoto[] = tiles.map(({ url, credit, place }) => ({
+  const viewer: ViewerPhoto[] = tiles.map(({ url, credit, source, place }) => ({
     url,
     credit,
+    source: source && { label: source.label, url: source.url },
     caption: place?.title,
     action: place ? { label: 'Открыть место', onSelect: () => openPlace(place.id) } : undefined,
   }));

@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 
-import { usePlaceParam } from '@/features/map';
+import { MapTapPin, usePlaceParam } from '@/features/map';
 import type { Category, Layer, PlaceDetail } from '@/shared/api';
 import type { LatLng } from '@/shared/lib/geo';
 import { LAYER_META } from '@/shared/lib/labels';
@@ -84,10 +84,14 @@ function Wizard({ preset, editing }: WizardProps) {
     backLabel: first ? 'Закрыть' : 'Назад',
   });
   const venue = preset.venueTitle ? `Встреча: ${preset.venueTitle}` : undefined;
+  // The chosen point stays marked on the map through every step but its own picker; an edited
+  // place has its own marker there.
+  const pin = point && !editing && <MapTapPin position={point} />;
 
   if (step === 'layer' || !layer) {
     return (
       <PanelLayout {...frame('Что добавим?', 'Выберите, о чём хотите рассказать')}>
+        {pin}
         <LayerStep
           onPick={(picked) =>
             setState({ ...state, layer: picked, category: undefined, step: 'category' })
@@ -100,6 +104,7 @@ function Wizard({ preset, editing }: WizardProps) {
   if (step === 'category' || !category) {
     return (
       <PanelLayout {...frame('Категория', venue ?? LAYER_META[layer].createTitle)}>
+        {pin}
         <CategoryStep
           layer={layer}
           selectedId={category?.id}
@@ -124,22 +129,27 @@ function Wizard({ preset, editing }: WizardProps) {
   }
 
   return (
-    <DetailsStep
-      key={`${category.id}:${point.lat}:${point.lng}`}
-      frame={frame(editing ? 'Редактирование' : 'Последний шаг', venue ?? category.name)}
-      draft={{
-        layer,
-        category,
-        point,
-        venuePlaceId: preset.venuePlaceId ?? editing?.event?.venue_place_id ?? undefined,
-      }}
-      presetAreaId={preset.areaId}
-      editing={editing}
-      defaultValues={state.address && !editing ? { ...defaults, address: state.address } : defaults}
-      onChangeCategory={() => go('category')}
-      onChangePoint={() => go('point')}
-      onSaved={setSaved}
-    />
+    <>
+      {pin}
+      <DetailsStep
+        key={`${category.id}:${point.lat}:${point.lng}`}
+        frame={frame(editing ? 'Редактирование' : 'Последний шаг', venue ?? category.name)}
+        draft={{
+          layer,
+          category,
+          point,
+          venuePlaceId: preset.venuePlaceId ?? editing?.event?.venue_place_id ?? undefined,
+        }}
+        presetAreaId={preset.areaId}
+        editing={editing}
+        defaultValues={
+          state.address && !editing ? { ...defaults, address: state.address } : defaults
+        }
+        onChangeCategory={() => go('category')}
+        onChangePoint={() => go('point')}
+        onSaved={setSaved}
+      />
+    </>
   );
 }
 

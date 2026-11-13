@@ -99,7 +99,7 @@ def _filtered(filters: EventFilters, now: datetime, viewer: User | None) -> Sele
 async def list_events(
     session: AsyncSession, filters: EventFilters, viewer: User | None = None
 ) -> list[PlaceCard]:
-    """Public events; the viewer's own quietly held ones too, as they see them (SPEC §24.1)."""
+    """Public events; the viewer's own ones in a screening window too, as they see them (SPEC §24.1)."""
     now = utcnow()
     by_distance = filters.sort is EventSort.DISTANCE
     if filters.lat is None or filters.lng is None:

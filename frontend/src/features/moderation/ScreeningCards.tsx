@@ -22,20 +22,24 @@ function shownStatusLabel(detail: ModerationCaseDetail): string | null {
   return STATUS_META[shown as keyof typeof STATUS_META]?.label ?? null;
 }
 
-/** «Тихое удержание»: the author does not know — and must not find out from us. */
-export function QuietHoldBanner({ detail }: { detail: ModerationCaseDetail }) {
+/**
+ * The automatic check held the publication: only the author and moderators see it, and the
+ * author has been told why (in words without the model's numbers or their standing).
+ */
+export function ScreeningHoldBanner({ detail }: { detail: ModerationCaseDetail }) {
   if (!detail.quiet || !detail.hold) return null;
   const shown = shownStatusLabel(detail);
   return (
     <section className={cn('rounded-card p-4', TONES.warning.soft)}>
       <p className="flex items-center gap-2 font-display text-base font-semibold">
         <EyeOff size={18} aria-hidden />
-        Тихое удержание
+        Не прошло автоматическую проверку
       </p>
       <p className="mt-1.5 text-sm text-ink">
-        Публикацию видят только автор и модераторы. Автор не знает о проверке
-        {shown ? <> — у себя он видит статус «{shown}»</> : null}. «Одобрить» просто выпустит её,
-        без уведомлений и следов в истории.
+        Публикацию видят только автор и модераторы. Автору сообщили, что она не прошла проверку, и
+        показали причины — без уверенности модели и его внутренней оценки; у себя он видит её «На
+        проверке». «Одобрить» — обычное одобрение: автор получит уведомление
+        {shown ? <>, а публикация вернётся в статус «{shown}»</> : null}.
       </p>
       {detail.hold.source && (
         <p className="mt-2 text-xs text-ink-soft">

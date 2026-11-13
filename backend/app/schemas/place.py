@@ -59,6 +59,15 @@ class PhotoCredit(ApiModel):
     source_url: str
 
 
+class CoverSource(ApiModel):
+    """The map service a hot-linked cover is borrowed from (SPEC §20, §25): shown on the cover as
+    «Фото: <label>» linking to the object's page there."""
+
+    source: str
+    label: str
+    url: str
+
+
 class TextCredit(ApiModel):
     """Licence notice of a description taken from a free source; must be shown with it (SPEC §19, §21)."""
 
@@ -73,6 +82,15 @@ class PhotoOut(ApiModel):
     width: int
     height: int
     credit: PhotoCredit | None
+    on_review: bool = False
+    """The viewer's own photo that did not pass the screening: only they and moderators see it."""
+
+
+class ScreeningHold(ApiModel):
+    """The publication did not pass the automatic check and waits for a moderator (SPEC §24.1).
+    Only for its author and moderators; the reasons are in words without the model's numbers."""
+
+    reasons: list[str]
 
 
 class ExternalRating(ApiModel):
@@ -202,6 +220,7 @@ class PlaceBase(OwnedText):
     trust_score: int
     cover_url: str | None
     cover_credit: PhotoCredit | None
+    cover_source: CoverSource | None = None
     tags: list[str]
     rating_avg: float | None
     rating_count: int
@@ -263,6 +282,7 @@ class PlaceDetail(PlaceBase):
     can_edit: bool
     can_appeal: bool
     moderation_note: str | None
+    screening_hold: ScreeningHold | None
     object_id: str | None
     external_rating: ExternalRating | None
     comments_count: int

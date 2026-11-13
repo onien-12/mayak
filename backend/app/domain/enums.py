@@ -286,7 +286,7 @@ class AiTarget(StrEnum):
 
 
 class HoldState(StrEnum):
-    """Lifecycle of a quiet hold (SPEC §24.1)."""
+    """Lifecycle of a screening hold (SPEC §24.1; table `quiet_holds`, a historical name)."""
 
     SCREENING = "screening"
     HELD = "held"

@@ -143,7 +143,7 @@ export function visibleCount(stops: readonly DraftStop[]): number {
 
 /** Title shown in lists and sent to the API when the author left it empty. */
 export function stopTitle(stop: DraftStop, number: number): string {
-  return stop.title.trim() || (isVia(stop) ? 'Точка трека' : `Точка ${number}`);
+  return stop.title.trim() || (isVia(stop) ? 'Промежуточная точка' : `Точка ${number}`);
 }
 
 export function insertStop(
@@ -226,7 +226,7 @@ export function validateDraft(draft: RouteDraft): DraftErrors {
 /** `null` when the stops can be saved. */
 function validateStops(stops: readonly DraftStop[]): string | null {
   if (visibleCount(stops) < 2) return 'Нужно минимум две точки — старт и финиш';
-  if (stops.length > MAX_STOPS) return `Не больше ${MAX_STOPS} точек вместе с точками трека`;
+  if (stops.length > MAX_STOPS) return `Не больше ${MAX_STOPS} точек вместе с промежуточными`;
   return null;
 }
 

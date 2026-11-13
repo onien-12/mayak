@@ -1,5 +1,6 @@
 """Author routes: custom waypoints with a path computed once at save time (SPEC §12)."""
 
+from collections.abc import Collection
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
@@ -11,10 +12,12 @@ from sqlalchemy.orm import joinedload, selectinload
 from app.core import viewer as request_viewer
 from app.core.clock import utcnow
 from app.core.errors import ConflictError, FieldValidationError, ForbiddenError, NotFoundError
-from app.domain import content_check, gpx, levels, routing
+from app.domain import content_check, gpx, hold_reasons, levels, routing
 from app.domain.enums import (
+    ACTIVE_HOLD_STATES,
     PUBLIC_ROUTE_STATUSES,
     AiTarget,
+    HoldState,
     ModerationTrigger,
     PathMode,
     PathSource,
@@ -27,7 +30,7 @@ from app.domain.enums import (
     StopKind,
 )
 from app.models import Photo, Place, QuietHold, Review, Route, RouteSave, RouteStop, User
-from app.schemas.place import CombinedRating, PhotoOut
+from app.schemas.place import PhotoOut, PlaceCard, ScreeningHold
 from app.schemas.route import (
     RouteCard,
     RouteDetail,
@@ -39,7 +42,6 @@ from app.schemas.route import (
     StopInput,
 )
 from app.services import (
-    combined_ratings,
     content,
     mappers,
     moderation_cases,
@@ -93,7 +95,8 @@ def is_public(route: Route) -> bool:
 
 
 def listed_clause(viewer: User | None) -> ColumnElement[bool]:
-    """Public routes, plus the viewer's own quietly held ones that look published to them (SPEC §24.1)."""
+    """Public routes, plus the viewer's own ones in a screening window, which look published to
+    them (SPEC §24.1)."""
     public = and_(Route.visibility == RouteVisibility.PUBLIC, Route.status.in_(PUBLIC_ROUTE_STATUSES))
     if viewer is None:
         return public
@@ -103,13 +106,25 @@ def listed_clause(viewer: User | None) -> ColumnElement[bool]:
     return or_(public, own)
 
 
+async def _hold_statuses(
+    session: AsyncSession, routes: list[Route], states: Collection[HoldState]
+) -> dict[int, RouteStatus]:
+    pending = [route.id for route in routes if route.status is RouteStatus.PENDING]
+    holds = await quiet_holds.active_by_target(session, AiTarget.ROUTE, pending, states)
+    return {route_id: RouteStatus(hold.shown_status) for route_id, hold in holds.items() if hold.shown_status}
+
+
 async def shown_statuses(session: AsyncSession, routes: list[Route]) -> dict[int, RouteStatus]:
-    """What the authors of quietly held routes see instead of `pending`; moderators see the truth."""
+    """What the authors of routes in a screening window see instead of `pending`; a held route
+    is `pending` for its author too, and moderators see the truth."""
     if request_viewer.is_staff():
         return {}
-    pending = [route.id for route in routes if route.status is RouteStatus.PENDING]
-    holds = await quiet_holds.active_by_target(session, AiTarget.ROUTE, pending)
-    return {route_id: RouteStatus(hold.shown_status) for route_id, hold in holds.items() if hold.shown_status}
+    return await _hold_statuses(session, routes, (HoldState.SCREENING,))
+
+
+async def intended_status(session: AsyncSession, route: Route) -> RouteStatus:
+    """The status the route gets back when its screening window or hold ends well."""
+    return (await _hold_statuses(session, [route], ACTIVE_HOLD_STATES)).get(route.id, route.status)
 
 
 def can_view(route: Route, viewer: User | None) -> bool:
@@ -140,8 +155,8 @@ async def get_visible_route(session: AsyncSession, route_id: int, viewer: User |
 
 
 async def get_public_route(session: AsyncSession, route_id: int, viewer: User | None) -> Route:
-    """For saving, reviewing and complaining, which only make sense on public routes. A quietly
-    held route answers its author as if it were published."""
+    """For saving, reviewing and complaining, which only make sense on public routes. A route in
+    its screening window answers its author as if it were published."""
     route = await get_visible_route(session, route_id, viewer)
     seen = route.status
     if viewer is not None and viewer.id == route.author_id:
@@ -169,7 +184,7 @@ async def _cards(session: AsyncSession, routes: list[Route], viewer: User | None
 
 
 async def list_routes(session: AsyncSession, viewer: User | None, filters: RouteFilters) -> list[RouteCard]:
-    """Public routes (and the viewer's own quietly held ones); personal and unpublished ones
+    """Public routes (and the viewer's own ones in a screening window); personal and unpublished ones
     live in `list_my_routes`."""
     statement = select(Route).where(listed_clause(viewer)).options(*_ROUTE_LOAD)
     if filters.kinds:
@@ -215,11 +230,7 @@ async def list_saved_routes(session: AsyncSession, user: User) -> list[RouteCard
 
 
 def _stop_out(
-    stop: RouteStop,
-    now: datetime,
-    blends: dict[int, CombinedRating],
-    viewer: User | None,
-    shown: dict[int, PlaceStatus],
+    stop: RouteStop, cards: dict[int, PlaceCard], viewer: User | None, held_photos: set[int]
 ) -> RouteStopOut:
     """A linked place appears only to those who may see it (a held place stays its author's)."""
     place = stop.place if stop.place is not None and place_queries.can_view(stop.place, viewer) else None
@@ -232,11 +243,12 @@ def _stop_out(
         note=stop.note,
         landmark=stop.landmark,
         stay_min=stop.stay_min,
-        photos=[PhotoOut.model_validate(photo) for photo in stop.photos],
+        photos=[
+            PhotoOut.model_validate(photo).model_copy(update={"on_review": photo.id in held_photos})
+            for photo in stop.photos
+        ],
         distance_from_prev_m=stop.distance_from_prev_m,
-        place=mappers.place_card(place, now, combined_rating=blends.get(place.id), status=shown.get(place.id))
-        if place
-        else None,
+        place=cards.get(place.id) if place else None,
     )
 
 
@@ -251,18 +263,34 @@ async def build_detail(
         )
         is_saved = bool(await _saved_ids(session, viewer, [route.id]))
     linked = [stop.place for stop in route.stops if stop.place]
-    blends = await combined_ratings.for_places(session, linked)
-    shown_places = {} if request_viewer.is_staff() else await place_queries.shown_statuses(session, linked)
+    cards = {card.id: card for card in await place_queries.cards(session, linked, now)}
     status = (await shown_statuses(session, [route])).get(route.id)
+    is_author = viewer is not None and viewer.id == route.author_id
+    held_photos = (
+        await quiet_holds.held_ids(
+            session, AiTarget.PHOTO, [photo.id for stop in route.stops for photo in stop.photos]
+        )
+        if is_author
+        else set()
+    )
     return RouteDetail(
         **mappers.route_card_fields(route, is_saved=is_saved, status=status),
         tips=route.tips,
         path_mode=route.path_mode,
         path_source=route.path_source,
-        stops=[_stop_out(stop, now, blends, viewer, shown_places) for stop in route.stops],
+        stops=[_stop_out(stop, cards, viewer, held_photos) for stop in route.stops],
         can_edit=can_edit(route, viewer),
         my_rating=my_rating,
+        screening_hold=await _screening_hold(session, route) if can_edit(route, viewer) else None,
     )
+
+
+async def _screening_hold(session: AsyncSession, route: Route) -> ScreeningHold | None:
+    """Why the route did not pass the automatic check, while it waits for a moderator."""
+    hold = await quiet_holds.find_active(session, AiTarget.ROUTE, route.id)
+    if hold is None or hold.state is not HoldState.HELD:
+        return None
+    return ScreeningHold(reasons=hold_reasons.for_author(hold.reasons, AiTarget.ROUTE))
 
 
 async def get_detail(session: AsyncSession, route_id: int, viewer: User | None) -> RouteDetail:
@@ -474,7 +502,7 @@ async def _unchecked_photos(session: AsyncSession, route: Route) -> list[Photo]:
 async def _open_window(session: AsyncSession, route: Route, author: User, now: datetime) -> None:
     """Hide the public route from everyone else until its texts and new photos pass (SPEC §24.1);
     its author keeps seeing the status it has now."""
-    shown = (await shown_statuses(session, [route])).get(route.id, route.status)
+    shown = await intended_status(session, route)
     await quiet_holds.open_window(
         session,
         AiTarget.ROUTE,
@@ -600,7 +628,7 @@ async def _apply_visibility(
     if not was_public:
         await _publish(session, route, now, screen=screen)
         return
-    seen = (await shown_statuses(session, [route])).get(route.id, route.status)
+    intended = await intended_status(session, route)
     flags = [] if actor.is_staff else _text_flags(route)
     if flags:
         route.status = RouteStatus.PENDING
@@ -608,7 +636,7 @@ async def _apply_visibility(
         if hold is not None:
             hold.shown_status = RouteStatus.PENDING
         await moderation_cases.open_case(session, target, ModerationTrigger.AUTO_TEXT, now=now, flags=flags)
-    elif seen is RouteStatus.PENDING and actor.id == route.author_id:
+    elif intended is RouteStatus.PENDING and actor.id == route.author_id:
         await moderation_cases.open_case(session, target, ModerationTrigger.PREMODERATION, now=now)
     if screen and texts_changed and route.status is not RouteStatus.HIDDEN:
         await _open_window(session, route, actor, now)

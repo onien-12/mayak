@@ -8,6 +8,7 @@ from app.domain.interests import Topic
 from app.schemas.common import ApiModel, Latitude, Longitude, LongText, OwnedText
 from app.schemas.place import (
     CombinedRating,
+    CoverSource,
     ExternalRating,
     ExternalSource,
     ObjectId,
@@ -48,6 +49,7 @@ class AreaCard(OwnedText):
     radius_m: int
     cover_url: str | None
     cover_credit: PhotoCredit | None
+    cover_source: CoverSource | None = None
     places_count: int
     interest: int
     rating_avg: float | None

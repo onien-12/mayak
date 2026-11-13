@@ -81,7 +81,12 @@ interface FieldDef { key: string; label: string; type: "boolean" | "number" | "t
 interface Category { id: number; slug: string; layer: Layer; group: string; name: string; icon: string; fields: FieldDef[]; }
 
 interface Photo { id: number; url: string; width: number; height: number;
-  credit: PhotoCredit | null; }       // null = uploaded by a user of the platform
+  credit: PhotoCredit | null;         // null = uploaded by a user of the platform
+  on_review: boolean; }               // the viewer's own photo held by the automatic check (SPEC §24.1)
+// The publication did not pass the automatic check and waits for a moderator (SPEC §24.1); author and moderators only.
+// Plain lines: «Текст: бессмыслица», «Фото 2: не про место», «Текст: слишком мало сведений о месте»,
+// «Похоже на случайный набор букв: название», «Нужна ручная проверка модератора» — never the model's numbers.
+interface ScreeningHold { reasons: string[]; }
 // Freely licensed external photo (Wikimedia Commons). Must be shown with the photo.
 interface PhotoCredit { author: string; license: string; source_url: string; }      // e.g. «Алексей Кондратюк», «CC BY-SA 3.0»
 // Licence notice of a description taken from a free source (Wikivoyage, Wikipedia). Must be shown with the text.
@@ -123,6 +128,10 @@ interface IssueDetail extends IssueBrief {
   outage_buildings: OutageBuilding[];                // affected houses of an imported outage, [] otherwise
 }
 
+// A cover borrowed from a map service's photos for an object without any of its own (SPEC §20, §25):
+// hot-linked, never stored; null while external reviews are off. Shown as «Фото: <label>» linking to `url`.
+interface CoverSource { source: "yandex" | "2gis" | "google"; label: string; url: string; }
+
 // Used for map markers and every list.
 interface PlaceCard {
   id: number; layer: Layer; category_id: number; title: string;
@@ -130,6 +139,7 @@ interface PlaceCard {
   status: PlaceStatus; trust_score: number;           // 0..100
   cover_url: string | null; tags: string[];
   cover_credit: PhotoCredit | null;                   // set when the cover is a freely licensed external photo — show it on the cover
+  cover_source?: CoverSource | null;                  // set when the cover is borrowed from a map service (SPEC §25) — show its mark on it
   rating_avg: number | null; rating_count: number;
   combined_rating: CombinedRating | null;             // null: no source rating known, or external reviews off → show rating_avg
   author_id: number; created_at: string; last_confirmed_at: string | null; is_stale: boolean;
@@ -150,6 +160,7 @@ interface AreaCard {
   radius_m: number;                                   // bounding radius around the label point (for fitting the camera)
   cover_url: string | null;
   cover_credit: PhotoCredit | null;                   // as in PlaceCard
+  cover_source?: CoverSource | null;                  // as in PlaceCard
   places_count: number;                               // public infrastructure + tourism places inside
   interest: number;                                   // 0..100, how much there is to see/do (SPEC §17)
   rating_avg: number | null;                          // mean rating of the places inside
@@ -181,6 +192,7 @@ interface PlaceDetail extends Omit<PlaceCard, "event" | "issue"> {
   my_rating: number | null;
   is_favorite: boolean; can_edit: boolean; can_appeal: boolean;
   moderation_note: string | null;                     // last moderator reason while pending/hidden/archived
+  screening_hold: ScreeningHold | null;               // set while pending because of the automatic check (author, moderators)
   object_id: string | null;                           // the 2GIS map object this place is, if linked
   external_rating: ExternalRating | null;             // only for places linked to a 2GIS object (SPEC §19)
   comments_count: number;
@@ -191,8 +203,10 @@ interface PlaceDetail extends Omit<PlaceCard, "event" | "issue"> {
 interface HistoryEntry { id: number; kind: HistoryKind; message: string; actor: UserBrief | null;
   old_status: PlaceStatus | null; new_status: PlaceStatus | null; created_at: string; }
 
-interface Review { id: number; author: UserBrief; rating: number; text: string; created_at: string; }   // rating 1..5
-interface Comment { id: number; author: UserBrief; text: string; created_at: string; can_delete: boolean; }
+interface Review { id: number; author: UserBrief; rating: number; text: string; created_at: string;   // rating 1..5
+  on_review: boolean; }              // the viewer's own review held by the automatic check (SPEC §24.1)
+interface Comment { id: number; author: UserBrief; text: string; created_at: string; can_delete: boolean;
+  on_review: boolean; }              // the viewer's own comment held by the automatic check
 
 interface RouteCard {
   id: number; title: string; description: string; kind: RouteKind;
@@ -214,7 +228,8 @@ interface RouteStop {
   distance_from_prev_m: number | null;                // along the path; null for the first stop
   place: PlaceCard | null;                            // linked map place, if the stop was added from the map
 }
-interface RouteDetail extends RouteCard { tips: string | null; path_mode: PathMode; path_source: PathSource; stops: RouteStop[]; can_edit: boolean; my_rating: number | null; }
+interface RouteDetail extends RouteCard { tips: string | null; path_mode: PathMode; path_source: PathSource; stops: RouteStop[]; can_edit: boolean; my_rating: number | null;
+  screening_hold: ScreeningHold | null; }   // set while pending because of the automatic check (author, moderators)
 
 interface Collection { id: number; title: string; description: string; is_public: boolean; owner: UserBrief;
   items_count: number; cover_url: string | null; created_at: string; }
@@ -322,6 +337,7 @@ interface AreaGeometryCandidate { title: string; source: "2gis" | "osm"; geometr
 | DELETE | `/places/{id}`            | auth | author or mod; soft → `archived`; 204 |
 | GET    | `/places/{id}/history`    | opt  | → `HistoryEntry[]` newest first |
 | POST   | `/places/{id}/votes`      | auth | `{ kind: VoteKind; comment?: string; lat?: number; lng?: number }` → `PlaceDetail`. 403 on own place. `unclear` needs a `comment` of 5+ characters (422 on `comment` otherwise): it opens or joins a moderation case with the trigger `clarification`; the place keeps its status. The comment is shown to moderators only. |
+| DELETE | `/places/{id}/votes`      | auth | Takes the caller's vote back → `PlaceDetail` (`my_vote: null`, counts, trust and status recomputed without it). No vote — the place is returned unchanged. Casting again later is not rewarded a second time. |
 | GET    | `/places/{id}/reviews`    | opt  | → `Review[]` newest first |
 | POST   | `/places/{id}/reviews`    | auth | `{ rating: 1..5; text: string (≤ 2000) }` → `Review` (upsert). Only `infrastructure`/`tourism` (400 otherwise). |
 | GET    | `/places/{id}/comments`   | opt  | → `Comment[]` oldest first |
@@ -512,7 +528,10 @@ the page or its answer could not be read — the stored entry is unchanged, try 
 Yandex, 2GIS and Google are fetched independently on the first full request for a place/area (≤ 8 s, else `pending=true`), cached
 7 days. `cached_only=true` (the card's summary row, the photo fallback) answers from the cache only
 — lists never call these endpoints. Never mixed into `rating_avg`, `trust_score` or `interest`;
-`combined_rating` on cards (SPEC §22) is a separate blended figure read from this cache.
+`combined_rating` on cards (SPEC §22) is a separate blended figure read from this cache, and so is
+a card's `cover_source` cover (SPEC §25). `photos` holds what the source's page gave with the lookup:
+Yandex, 2GIS and Google up to 30 each (SPEC §20): main photos first, then the photos attached to
+reviews; a source with photos but no rating or reviews is still listed.
 2GIS uses its anonymous web HTTP API and returns up to 30 recent reviews. Its cache and request
 budget are independent of Yandex. The existing fresh aggregate-rating cache for linked
 `object_id`s remains a fallback (`reviews_available=false`) only with current matching evidence
@@ -575,6 +594,7 @@ interface MapNote {
   object_id: string | null;          // 2GIS map object id the note is attached to (from the MapGL click target)
   object_name: string | null;        // its name/address at the time of writing
   author: UserBrief; created_at: string; can_delete: boolean; reported_by_me: boolean;
+  on_review: boolean;                // the viewer's own note held by the automatic check (SPEC §24.1)
 }
 ```
 
@@ -620,7 +640,7 @@ interface ModerationCase {
   author: UserBrief; triggers: ModerationTrigger[]; risk: number;          // 0..100
   complaints_count: number; state: "open" | "resolved"; created_at: string; resolved_at: string | null;
   ai_verdict: AiVerdict | null;           // latest LLM verdict, for the queue row; details in ModerationCaseDetail.ai_review
-  quiet: boolean;                         // quietly held (SPEC §24.1): the author does not know and sees it as published
+  quiet: boolean;                         // held by the automatic check (SPEC §24.1); the author was told why. Historical name
   resolution: { action: ModerationAction; reason: string; moderator: UserBrief } | null;
 }
 // LLM pre-screening result. Advisory: only a human moderator makes final decisions.
@@ -637,13 +657,13 @@ interface ModerationCaseDetail extends ModerationCase {
   ai_review: AiReview | null;            // latest LLM opinion about the text (SPEC §14); advisory only
   appeal_text: string | null;
   history: HistoryEntry[];               // empty for routes
-  hold: QuietHold | null;                // the screening window / quiet hold of the target, if it ever had one
+  hold: QuietHold | null;                // the screening window / hold of the target, if it ever had one
   photo_reviews: PhotoReview[];          // every screened photo of the target with its own check, held ones first
   usefulness: number | null;             // hidden usefulness of a place, 0..100 (SPEC §24.3); null when never rated
   author_standing: number;               // hidden standing of the author, 0..100 (SPEC §24.4)
 }
 interface QuietHold { state: HoldState; source: HoldSource | null; reasons: string[];
-  shown_status: PlaceStatus | RouteStatus | null;   // what the author sees instead of the real status
+  shown_status: PlaceStatus | RouteStatus | null;   // the status it gets back when released; the author sees it during the window
   created_at: string; updated_at: string; }
 interface PhotoReview { photo: Photo; state: HoldState; reasons: string[]; ai_review: AiReview | null; }
 // A photo, comment, review or note held on its own (SPEC §24.1). Texts are the originals.
@@ -666,7 +686,7 @@ interface ModerationLogEntry { id: number; case_id: number; moderator: UserBrief
 | GET  | `/moderation/cases/{id}`          | mod | → `ModerationCaseDetail` |
 | POST | `/moderation/cases/{id}/resolve`  | mod | `{ action: ModerationAction; reason: string (3..1000) }` → `ModerationCaseDetail`. 409 if already resolved, and for cases of held photos / comments / reviews / notes (they are decided below). `release` / `remove` are not accepted here. |
 | GET  | `/moderation/held`                | mod | → `HeldItem[]` oldest first: photos, comments, reviews and notes held on their own; params `kind` (`photo` · `comment` · `review` · `note`), `limit` (default 50, max 200), `offset` |
-| POST | `/moderation/held/{id}/release`   | mod | `{ reason: string (3..1000) }` → 204. The item appears as if it had passed; its author is not told. 404 unknown, 409 already decided. |
+| POST | `/moderation/held/{id}/release`   | mod | `{ reason: string (3..1000) }` → 204. The item appears as if it had passed; the author gets a `moderation` notification («Ваш комментарий проверен и опубликован»…) with the reason. 404 unknown, 409 already decided. |
 | POST | `/moderation/held/{id}/remove`    | mod | `{ reason }` → 204. Stays hidden for good (a photo comes off its place); the author gets a `moderation` notification with the reason. |
 | GET  | `/moderation/log?limit=50&offset` | mod | → `ModerationLogEntry[]` newest first (`release` / `remove` included) |
 
@@ -775,6 +795,10 @@ Behaviour the tables above leave open, as implemented:
   always come first in `PlaceDetail.photos`; external photos do not count towards the 12-photo limit
   and are kept when the place's `photo_ids` list includes them (an editor may drop one by leaving it out).
   `AreaCard.cover_url` is the best cover among the places inside, else the area's own first photo.
+  An existing database receives a newly committed Wikimedia snapshot once, at the next start-up.
+  With nothing of that kind, a place or area may carry a cover borrowed from a map service's photos
+  (`cover_source` set, `cover_credit` null; SPEC §25) — read from the external reviews' cache, never
+  from the location a place lies in.
 - **`external_rating`** is fetched from 2GIS only by `GET /places/{id}` / `GET /areas/{id}` (never by
   lists or writes), at most once a week per object and `TWOGIS_RATING_DAILY_LIMIT` (30) times per rolling
   day overall; a failed request keeps the last known rating and is retried after a day; an object without
@@ -815,11 +839,18 @@ Behaviour the tables above leave open, as implemented:
 - **Screening** (SPEC §24): everything a non-moderator publishes or changes — places, public
   routes, photos (each on its own, including `POST /places/{id}/photos` on any place), comments,
   reviews with text, notes — is invisible to everyone but its author and moderators until the
-  checks pass; publishing still answers at once. The author sees it exactly as published: the
-  same `status`, `moderation_note`, `can_appeal`, lists, counters (`comments_count`,
-  `rating_avg`/`rating_count` of `PlaceDetail`, profile `stats`), no notification, no history
-  entry; moderators see the real status (`pending`). Others get 404 for the item and never see it
-  in a list, a count, a cover, an area, search, statistics or recommendations. A territory
+  checks pass; publishing still answers at once. During the screening window (a few seconds) the
+  author sees it as published: the same `status`, lists, counters (`comments_count`,
+  `rating_avg`/`rating_count` of `PlaceDetail`, profile `stats`); moderators see the real status
+  (`pending`). When the window ends in a hold, the author sees the truth: a place or route is
+  `pending` for them too (cards, lists, counters) with `screening_hold.reasons`; a held place gets
+  a history entry «Публикация отправлена на проверку автоматическим фильтром»; a held photo,
+  comment, review or note stays visible to them with `on_review: true`; and they get one
+  `moderation` notification per hold («Публикация «…» не прошла автоматическую проверку», the
+  reasons, «Пока её видите только вы — модератор посмотрит и решит.»). A moderator's `approve` of
+  a held place or route is an ordinary approval with its notification and history entry.
+  Others get 404 for the item and never see it in a list, a count, a cover, an area, search,
+  statistics or recommendations. A territory
   notification, the comment notification to the place's author and a photo's
   «Добавлено фото» history entry are sent when the item is released. Without an OpenRouter key
   the checks resolve inside the request.

@@ -262,28 +262,31 @@ async def test_private_routes_are_personal_and_unmoderated(world: World, client:
     published = (
         await newcomer.patch(path, json={"visibility": "public", "title": "План на выходные"})
     ).json()
-    assert (published["visibility"], published["status"]) == ("public", "pending")
+    # Published at once; with no model to check it, a newcomer's route then waits for a moderator.
+    assert (published["visibility"], published["status"]) == ("public", "published")
     queue = (await moderator.get("/moderation/queue")).json()
-    assert [(case["target_type"], case["triggers"]) for case in queue] == [("route", ["premoderation"])]
+    assert [(case["target_type"], case["triggers"]) for case in queue] == [("route", ["auto_ai"])]
 
     hidden_again = (await newcomer.patch(path, json={"visibility": "private"})).json()
     assert (hidden_again["visibility"], hidden_again["status"]) == ("private", "published")
     assert (await moderator.get("/moderation/queue")).json() == []
 
 
-async def test_newcomer_public_route_is_premoderated(world: World, client: AsyncClient) -> None:
+async def test_newcomer_public_route_waits_for_a_moderator_when_the_check_did_not_happen(
+    world: World, client: AsyncClient
+) -> None:
     newcomer = await world.actor("newcomer")
     moderator = await world.actor("moderator", role=UserRole.MODERATOR)
 
     route = (await newcomer.post("/routes", json=_route_body([_custom_stop(0), _custom_stop(1)]))).json()
-    assert route["status"] == "pending"
+    assert route["status"] == "published"
     assert (await client.get(f"{API}/routes")).json() == []
     assert (await client.get(f"{API}/routes/{route['id']}")).status_code == 404
     assert (await newcomer.get("/routes")).json() == []
     assert [item["status"] for item in (await newcomer.get("/me/routes")).json()] == ["pending"]
 
     case = (await moderator.get("/moderation/queue", params={"target_type": "route"})).json()[0]
-    assert (case["target_id"], case["layer"], case["triggers"]) == (route["id"], None, ["premoderation"])
+    assert (case["target_id"], case["layer"], case["triggers"]) == (route["id"], None, ["auto_ai"])
     detail = (await moderator.get(f"/moderation/cases/{case['id']}")).json()
     assert detail["route"]["id"] == route["id"]
     assert (detail["place"], detail["history"], detail["ai_review"]) == (None, [], None)
@@ -293,7 +296,7 @@ async def test_newcomer_public_route_is_premoderated(world: World, client: Async
     )
     assert resolved.json()["route"]["status"] == "published"
     assert len((await client.get(f"{API}/routes")).json()) == 1
-    assert (await newcomer.get("/auth/me")).json()["reputation"] == 4 + 5
+    assert (await newcomer.get("/auth/me")).json()["reputation"] == 5
 
 
 async def test_update_and_delete_route(

@@ -30,7 +30,7 @@ from app.schemas.common import (
     OwnedText,
     Title,
 )
-from app.schemas.place import PhotoOut, PlaceCard, normalize_tags
+from app.schemas.place import PhotoOut, PlaceCard, ScreeningHold, normalize_tags
 from app.schemas.user import UserBrief
 
 MAX_STAY_MIN = 600
@@ -105,6 +105,8 @@ class RouteDetail(RouteCard):
     stops: list[RouteStopOut]
     can_edit: bool
     my_rating: int | None
+    screening_hold: ScreeningHold | None
+    """Only for the author and moderators, while the route waits for a moderator (SPEC §24.1)."""
 
     @field_serializer("tips")
     def _tips(self, value: str | None, info: SerializationInfo) -> str | None:

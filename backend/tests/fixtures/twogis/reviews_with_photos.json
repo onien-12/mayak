@@ -1,0 +1,271 @@
+{
+ "meta": {
+  "branch_rating": 5,
+  "branch_rating_is_confirmed": true,
+  "branch_reviews_count": 3851,
+  "code": 200,
+  "next_link": null,
+  "total_count": 4
+ },
+ "reviews": [
+  {
+   "additional_data": {
+    "external_id": null,
+    "filtered_facts": null,
+    "has_unresolved_complaints": false,
+    "ip": "",
+    "is_liked": null,
+    "is_unrated_permanently": null,
+    "pin_status": "none",
+    "status_history": [],
+    "user_agent": ""
+   },
+   "comments_count": 1,
+   "date_created": "2026-11-13T09:51:15.200731+07:00",
+   "date_edited": null,
+   "hiding_reason": null,
+   "hiding_type": null,
+   "id": "synthetic-2gis-0",
+   "is_hidden": false,
+   "is_rated": true,
+   "is_verified": false,
+   "likes_count": 0,
+   "object": {
+    "id": "70000001024450259",
+    "type": "branch"
+   },
+   "official_answer": null,
+   "on_moderation": false,
+   "photos": [
+    {
+     "date_created": "2026-11-13T09:51:15.23553+07:00",
+     "id": "00000000-0000-4000-8000-000000000001",
+     "preview_urls": {
+      "1920x": "https://cachizer3.2gis.com/reviews-photos/00000000-0000-4000-8000-000000000001.jpg?w=1920",
+      "320x": "https://cachizer3.2gis.com/reviews-photos/00000000-0000-4000-8000-000000000001.jpg?w=320",
+      "640x": "https://cachizer3.2gis.com/reviews-photos/00000000-0000-4000-8000-000000000001.jpg?w=640",
+      "64x64": "https://cachizer3.2gis.com/reviews-photos/00000000-0000-4000-8000-000000000001.jpg?h=64&w=64",
+      "url": "https://cachizer3.2gis.com/reviews-photos/00000000-0000-4000-8000-000000000001.jpg"
+     },
+     "processing_status": "finished",
+     "visibility_status": "visible"
+    }
+   ],
+   "provider": "2gis",
+   "rating": 5,
+   "region_id": 25,
+   "source": null,
+   "text": "Тестовый отзыв 1 с фото.",
+   "url": "",
+   "user": {
+    "name": "Synthetic Private Author",
+    "photo_preview_urls": {
+     "url": "https://i0.photo.2gis.com/avatar/private.jpg"
+    }
+   }
+  },
+  {
+   "additional_data": {
+    "external_id": null,
+    "filtered_facts": null,
+    "has_unresolved_complaints": false,
+    "ip": "",
+    "is_liked": null,
+    "is_unrated_permanently": null,
+    "pin_status": "none",
+    "status_history": [],
+    "user_agent": ""
+   },
+   "comments_count": 1,
+   "date_created": "2026-11-12T22:22:04.164838+07:00",
+   "date_edited": "2026-11-12T22:22:56.311612+07:00",
+   "hiding_reason": null,
+   "hiding_type": null,
+   "id": "synthetic-2gis-1",
+   "is_hidden": false,
+   "is_rated": true,
+   "is_verified": false,
+   "likes_count": 0,
+   "object": {
+    "id": "70000001024450259",
+    "type": "branch"
+   },
+   "official_answer": null,
+   "on_moderation": false,
+   "photos": [
+    {
+     "date_created": "2026-11-12T22:22:56.311612+07:00",
+     "id": "00000000-0000-4000-8000-000000000002",
+     "preview_urls": {
+      "1920x": "https://cachizer3.2gis.com/reviews-photos/00000000-0000-4000-8000-000000000002.jpg?w=1920",
+      "320x": "https://cachizer3.2gis.com/reviews-photos/00000000-0000-4000-8000-000000000002.jpg?w=320",
+      "640x": "https://cachizer3.2gis.com/reviews-photos/00000000-0000-4000-8000-000000000002.jpg?w=640",
+      "64x64": "https://cachizer3.2gis.com/reviews-photos/00000000-0000-4000-8000-000000000002.jpg?h=64&w=64",
+      "url": "https://cachizer3.2gis.com/reviews-photos/00000000-0000-4000-8000-000000000002.jpg"
+     },
+     "processing_status": "finished",
+     "visibility_status": "visible"
+    },
+    {
+     "date_created": "2026-11-12T22:22:56.311612+07:00",
+     "id": "00000000-0000-4000-8000-000000000003",
+     "preview_urls": {
+      "1920x": "https://cachizer3.2gis.com/reviews-photos/00000000-0000-4000-8000-000000000003.jpg?w=1920",
+      "320x": "https://cachizer3.2gis.com/reviews-photos/00000000-0000-4000-8000-000000000003.jpg?w=320",
+      "640x": "https://cachizer3.2gis.com/reviews-photos/00000000-0000-4000-8000-000000000003.jpg?w=640",
+      "64x64": "https://cachizer3.2gis.com/reviews-photos/00000000-0000-4000-8000-000000000003.jpg?h=64&w=64",
+      "url": "https://cachizer3.2gis.com/reviews-photos/00000000-0000-4000-8000-000000000003.jpg"
+     },
+     "processing_status": "finished",
+     "visibility_status": "visible"
+    }
+   ],
+   "provider": "2gis",
+   "rating": 5,
+   "region_id": 25,
+   "source": null,
+   "text": "Тестовый отзыв 2 с фото.",
+   "url": "",
+   "user": {
+    "name": "Synthetic Private Author",
+    "photo_preview_urls": {
+     "url": "https://i0.photo.2gis.com/avatar/private.jpg"
+    }
+   }
+  },
+  {
+   "additional_data": {
+    "external_id": null,
+    "filtered_facts": null,
+    "has_unresolved_complaints": false,
+    "ip": "",
+    "is_liked": null,
+    "is_unrated_permanently": null,
+    "pin_status": "none",
+    "status_history": [],
+    "user_agent": ""
+   },
+   "comments_count": 1,
+   "date_created": "2026-11-12T18:41:51.019424+07:00",
+   "date_edited": "2026-11-12T19:17:38.01498+07:00",
+   "hiding_reason": null,
+   "hiding_type": null,
+   "id": "synthetic-2gis-2",
+   "is_hidden": false,
+   "is_rated": true,
+   "is_verified": false,
+   "likes_count": 0,
+   "object": {
+    "id": "70000001024450259",
+    "type": "branch"
+   },
+   "official_answer": null,
+   "on_moderation": false,
+   "photos": [
+    {
+     "date_created": "2026-11-12T19:17:38.01498+07:00",
+     "id": "00000000-0000-4000-8000-000000000004",
+     "preview_urls": {
+      "1920x": "https://cachizer3.2gis.com/reviews-photos/00000000-0000-4000-8000-000000000004.jpg?w=1920",
+      "320x": "https://cachizer3.2gis.com/reviews-photos/00000000-0000-4000-8000-000000000004.jpg?w=320",
+      "640x": "https://cachizer3.2gis.com/reviews-photos/00000000-0000-4000-8000-000000000004.jpg?w=640",
+      "64x64": "https://cachizer3.2gis.com/reviews-photos/00000000-0000-4000-8000-000000000004.jpg?h=64&w=64",
+      "url": "https://cachizer3.2gis.com/reviews-photos/00000000-0000-4000-8000-000000000004.jpg"
+     },
+     "processing_status": "finished",
+     "visibility_status": "visible"
+    },
+    {
+     "date_created": "2026-11-12T19:17:38.01498+07:00",
+     "id": "00000000-0000-4000-8000-000000000005",
+     "preview_urls": {
+      "1920x": "https://cachizer3.2gis.com/reviews-photos/00000000-0000-4000-8000-000000000005.jpg?w=1920",
+      "320x": "https://cachizer3.2gis.com/reviews-photos/00000000-0000-4000-8000-000000000005.jpg?w=320",
+      "640x": "https://cachizer3.2gis.com/reviews-photos/00000000-0000-4000-8000-000000000005.jpg?w=640",
+      "64x64": "https://cachizer3.2gis.com/reviews-photos/00000000-0000-4000-8000-000000000005.jpg?h=64&w=64",
+      "url": "https://cachizer3.2gis.com/reviews-photos/00000000-0000-4000-8000-000000000005.jpg"
+     },
+     "processing_status": "finished",
+     "visibility_status": "visible"
+    }
+   ],
+   "provider": "2gis",
+   "rating": 5,
+   "region_id": 25,
+   "source": null,
+   "text": "Тестовый отзыв 3 с фото.",
+   "url": "",
+   "user": {
+    "name": "Synthetic Private Author",
+    "photo_preview_urls": {
+     "url": "https://i0.photo.2gis.com/avatar/private.jpg"
+    }
+   }
+  },
+  {
+   "additional_data": {
+    "external_id": null,
+    "filtered_facts": null,
+    "has_unresolved_complaints": false,
+    "ip": "",
+    "is_liked": null,
+    "is_unrated_permanently": null,
+    "pin_status": "none",
+    "status_history": [],
+    "user_agent": ""
+   },
+   "comments_count": 1,
+   "date_created": "2026-11-13T09:51:15.200731+07:00",
+   "date_edited": null,
+   "hiding_reason": null,
+   "hiding_type": null,
+   "id": "synthetic-2gis-3",
+   "is_hidden": false,
+   "is_rated": true,
+   "is_verified": false,
+   "likes_count": 0,
+   "object": {
+    "id": "70000001024450259",
+    "type": "branch"
+   },
+   "official_answer": null,
+   "on_moderation": false,
+   "photos": [
+    {
+     "date_created": "2026-11-13T09:51:15.23553+07:00",
+     "id": "00000000-0000-4000-8000-000000000006",
+     "preview_urls": {
+      "1920x": "https://cachizer3.2gis.com/reviews-photos/00000000-0000-4000-8000-000000000006.jpg?w=1920",
+      "320x": "https://cachizer3.2gis.com/reviews-photos/00000000-0000-4000-8000-000000000006.jpg?w=320",
+      "640x": "https://cachizer3.2gis.com/reviews-photos/00000000-0000-4000-8000-000000000006.jpg?w=640",
+      "64x64": "https://cachizer3.2gis.com/reviews-photos/00000000-0000-4000-8000-000000000006.jpg?h=64&w=64",
+      "url": "https://cachizer3.2gis.com/reviews-photos/00000000-0000-4000-8000-000000000006.jpg"
+     },
+     "processing_status": "finished",
+     "visibility_status": "hidden"
+    },
+    {
+     "date_created": "2026-11-13T09:51:15.23553+07:00",
+     "id": "00000000-0000-4000-8000-000000000007",
+     "preview_urls": {
+      "1920x": "https://evil.example/x.jpg"
+     },
+     "processing_status": "finished",
+     "visibility_status": "visible"
+    }
+   ],
+   "provider": "2gis",
+   "rating": 5,
+   "region_id": 25,
+   "source": null,
+   "text": "Тестовый отзыв 4: фото скрыто или с чужого адреса.",
+   "url": "",
+   "user": {
+    "name": "Synthetic Private Author",
+    "photo_preview_urls": {
+     "url": "https://i0.photo.2gis.com/avatar/private.jpg"
+    }
+   }
+  }
+ ]
+}
