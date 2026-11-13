@@ -1,0 +1,11 @@
+osm_snapshot.json — OpenStreetMap base layer of «Маяк» (SPEC §18)
+
+Data © участники OpenStreetMap (OpenStreetMap contributors), available under the
+Open Database License (ODbL) 1.0: https://www.openstreetmap.org/copyright
+
+Fetched once with a single Overpass API query for the bounding box in the file header
+(south, west, north, east), reduced to the tags the importer uses; territory outlines are
+simplified to at most 200 vertices. Regenerate with `uv run python -m app.osm_import --fetch`.
+
+This file is a derivative database of OpenStreetMap and stays under ODbL. Content added by
+the platform's users is stored separately (places without `external_id = osm:*`).

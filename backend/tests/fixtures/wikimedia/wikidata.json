@@ -1,0 +1,18 @@
+{
+ "entities": {
+  "Q1": {
+   "type": "item",
+   "id": "Q1",
+   "claims": {
+    "P18": [{"mainsnak": {"snaktype": "value", "property": "P18", "datavalue": {"value": "Tokarevsky_lighthouse.jpg", "type": "string"}}}],
+    "P373": [{"mainsnak": {"snaktype": "value", "property": "P373", "datavalue": {"value": "Tokarevsky Lighthouse", "type": "string"}}}]
+   },
+   "sitelinks": {"ruwiki": {"site": "ruwiki", "title": "Токаревский маяк", "badges": []}}
+  },
+  "Q2": {"type": "item", "id": "Q2", "claims": {}, "sitelinks": {}},
+  "Q3": {"id": "Q3", "missing": ""},
+  "P31": {"type": "property", "id": "P31", "claims": {}},
+  "Q4": {"type": "item", "id": "Q4", "claims": {"P18": [{"mainsnak": {"snaktype": "somevalue"}}]}, "sitelinks": {"ruwiki": {"title": 42}}}
+ },
+ "success": 1
+}

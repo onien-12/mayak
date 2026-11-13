@@ -1,0 +1,295 @@
+@import 'tailwindcss';
+
+/* Lite graphics tier (`<html data-graphics="lite">`, see `shared/ui/graphics.ts`). */
+@custom-variant lite (&:where([data-graphics='lite'] *));
+
+@theme {
+  --color-ink: #0b1d2e;
+  --color-ink-soft: #52647a;
+  --color-ink-faint: #8a99ab;
+  --color-line: #e2e8ee;
+  --color-canvas: #f2f5f8;
+  --color-surface: #ffffff;
+
+  --color-brand: #0b2a4a;
+  --color-brand-hover: #123a63;
+  --color-brand-soft: #e7edf3;
+  --color-beam: #ffd23f;
+  --color-beam-soft: #fff6d6;
+
+  --color-infrastructure: #0ea5a4;
+  --color-infrastructure-soft: #e2f4f4;
+  --color-infrastructure-ink: #0a6e6d;
+  --color-event: #7c5cfc;
+  --color-event-soft: #efebff;
+  --color-event-ink: #5a3fd6;
+  --color-tourism: #f97316;
+  --color-tourism-soft: #feeee2;
+  --color-tourism-ink: #b8500a;
+  --color-issue: #e5484d;
+  --color-issue-soft: #fce9ea;
+  --color-issue-ink: #b9353a;
+
+  --color-success: #1f9d55;
+  --color-success-soft: #e4f3ea;
+  --color-success-ink: #17723f;
+  --color-warning: #e8a317;
+  --color-warning-soft: #fcf4e3;
+  --color-warning-ink: #8f620a;
+  --color-danger: #d93d42;
+  --color-danger-soft: #fbe8e8;
+  --color-danger-ink: #ad2a2f;
+  --color-official: #2563eb;
+  --color-official-soft: #e5edfd;
+  --color-official-ink: #1d4fc0;
+
+  --font-sans: 'Onest Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Unbounded Variable', 'Onest Variable', ui-sans-serif, system-ui, sans-serif;
+
+  --text-2xs: 11px;
+  --text-2xs--line-height: 14px;
+  --text-xs: 12px;
+  --text-xs--line-height: 16px;
+  --text-sm: 13px;
+  --text-sm--line-height: 18px;
+  --text-base: 15px;
+  --text-base--line-height: 22px;
+  --text-lg: 17px;
+  --text-lg--line-height: 24px;
+  --text-xl: 20px;
+  --text-xl--line-height: 26px;
+  --text-2xl: 24px;
+  --text-2xl--line-height: 30px;
+  --text-3xl: 32px;
+  --text-3xl--line-height: 38px;
+
+  --radius-panel: 20px;
+  --radius-card: 16px;
+  --radius-control: 12px;
+
+  --shadow-card: 0 1px 2px rgb(11 29 46 / 0.05), 0 4px 14px -6px rgb(11 29 46 / 0.1);
+  --shadow-float: 0 1px 3px rgb(11 29 46 / 0.08), 0 16px 40px -12px rgb(11 29 46 / 0.22);
+  --shadow-pin: 0 1px 2px rgb(11 29 46 / 0.25), 0 6px 12px -4px rgb(11 29 46 / 0.3);
+
+  --ease-out-soft: cubic-bezier(0.22, 0.8, 0.3, 1);
+
+  --animate-fade-in: fade-in 180ms var(--ease-out-soft) both;
+  --animate-pop-in: pop-in 180ms var(--ease-out-soft) both;
+  --animate-slide-up: slide-up 220ms var(--ease-out-soft) both;
+  --animate-slide-in-left: slide-in-left 200ms var(--ease-out-soft) both;
+  --animate-shimmer: shimmer 1.5s ease-in-out infinite;
+  --animate-pulse-ring: pulse-ring 1.8s ease-out infinite;
+  --animate-beam-pulse: beam-pulse 1.6s ease-in-out infinite;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes pop-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px) scale(0.98);
+    }
+  }
+  @keyframes slide-up {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+  }
+  @keyframes slide-in-left {
+    from {
+      opacity: 0;
+      transform: translateX(-12px);
+    }
+  }
+  @keyframes shimmer {
+    to {
+      transform: translateX(100%);
+    }
+  }
+  @keyframes pulse-ring {
+    0% {
+      transform: scale(0.9);
+      opacity: 0.55;
+    }
+    100% {
+      transform: scale(1.9);
+      opacity: 0;
+    }
+  }
+  @keyframes beam-pulse {
+    0%,
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.45;
+      transform: scale(1.12);
+    }
+  }
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.45;
+    color: var(--color-ink);
+    background: var(--color-canvas);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overscroll-behavior: none;
+  }
+
+  #root {
+    height: 100dvh;
+  }
+
+  button,
+  [role='button'],
+  a,
+  label[for],
+  summary {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: var(--color-beam);
+    color: var(--color-ink);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@utility glass {
+  background: rgb(255 255 255 / 0.92);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+}
+
+@utility scroll-area {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(138 153 171 / 0.45) transparent;
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@utility font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+@utility skeleton {
+  position: relative;
+  overflow: hidden;
+  background: #e9eef3;
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.75), transparent);
+    transform: translateX(-100%);
+    animation: var(--animate-shimmer);
+  }
+}
+
+/* Extends the hit area of small controls to 44 × 44 px on touch layouts (element must be positioned). */
+@utility tap-target {
+  &::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+  @media (min-width: 64rem) {
+    &::after {
+      display: none;
+    }
+  }
+}
+
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.mapgl-host canvas {
+  outline: none;
+}
+
+/*
+ * Lite graphics tier: the same layout and colours without the expensive effects —
+ * no backdrop blur (translucent surfaces turn opaque, see `glass` and the `lite:` classes),
+ * a shorter floating shadow, no infinite decorative animations. Spinners stay: they say
+ * something is loading.
+ */
+[data-graphics='lite'] {
+  --animate-shimmer: none;
+  --animate-pulse-ring: none;
+  --animate-beam-pulse: none;
+
+  & *,
+  & ::before,
+  & ::after {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+
+  & .glass {
+    background: var(--color-surface);
+  }
+
+  & .shadow-float {
+    --tw-shadow:
+      0 1px 3px var(--tw-shadow-color, rgb(11 29 46 / 0.1)),
+      0 6px 16px -8px var(--tw-shadow-color, rgb(11 29 46 / 0.24));
+  }
+}
+
+/* Bottom sheet: content scrolls only at full height; below that a vertical swipe moves the sheet. */
+[data-sheet-snap]:not([data-sheet-snap='full']) {
+  touch-action: pan-x;
+}
+[data-sheet-snap]:not([data-sheet-snap='full']) [data-sheet-scroll] {
+  overflow-y: hidden;
+}

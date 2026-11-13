@@ -1,0 +1,51 @@
+# Маяк — full stack in two containers.
+#   cp .env.example .env   # fill in the keys
+#   docker compose up --build
+# The app is then served at http://localhost:${WEB_PORT:-8080}.
+
+services:
+  backend:
+    build: ./backend
+    environment:
+      SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env}
+      TWOGIS_API_KEY: ${TWOGIS_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      CORS_ORIGINS: http://localhost:${WEB_PORT:-8080}
+      AFISHA_IMPORT_ENABLED: ${AFISHA_IMPORT_ENABLED:-true}
+      OUTAGES_IMPORT_ENABLED: ${OUTAGES_IMPORT_ENABLED:-true}
+      EXTERNAL_REVIEWS_ENABLED: ${EXTERNAL_REVIEWS_ENABLED:-false}
+      EXTERNAL_REVIEWS_TWOGIS_ENABLED: ${EXTERNAL_REVIEWS_TWOGIS_ENABLED:-true}
+      EXTERNAL_REVIEWS_GOOGLE_ENABLED: ${EXTERNAL_REVIEWS_GOOGLE_ENABLED:-true}
+      EXTERNAL_REVIEWS_PROXY_URL: ${EXTERNAL_REVIEWS_PROXY_URL:-}
+      EXTERNAL_REVIEWS_REQUEST_TIMEOUT_S: ${EXTERNAL_REVIEWS_REQUEST_TIMEOUT_S:-20}
+      EXTERNAL_REVIEWS_DAILY_REQUEST_CAP: ${EXTERNAL_REVIEWS_DAILY_REQUEST_CAP:-10000}
+      EXTERNAL_REVIEWS_LLM_MODEL: ${EXTERNAL_REVIEWS_LLM_MODEL:-typesafe/jev-router}
+      EXTERNAL_REVIEWS_LLM_ENABLED: ${EXTERNAL_REVIEWS_LLM_ENABLED:-}
+      INTERESTS_LLM_ENABLED: ${INTERESTS_LLM_ENABLED:-}
+      INTERESTS_LLM_MODEL: ${INTERESTS_LLM_MODEL:-typesafe/jev-router}
+      INTERESTS_LLM_DAILY_REQUEST_CAP: ${INTERESTS_LLM_DAILY_REQUEST_CAP:-2000}
+    volumes:
+      - mayak-data:/app/data
+      - mayak-media:/app/media
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        VITE_2GIS_KEY: ${TWOGIS_API_KEY:-}
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    restart: unless-stopped
+
+volumes:
+  mayak-data:
+  mayak-media:

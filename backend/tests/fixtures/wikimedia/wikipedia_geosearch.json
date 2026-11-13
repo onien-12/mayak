@@ -1,0 +1,42 @@
+{
+ "batchcomplete": true,
+ "query": {
+  "geosearch": [
+   {
+    "pageid": 6625309,
+    "ns": 0,
+    "title": "Николаевские триумфальные ворота",
+    "lat": 43.114009,
+    "lon": 131.891842,
+    "dist": 185.7,
+    "primary": true
+   },
+   {
+    "pageid": 775294,
+    "ns": 0,
+    "title": "С-56",
+    "lat": 43.113444,
+    "lon": 131.891222,
+    "dist": 199.4,
+    "primary": true
+   },
+   {
+    "pageid": 8001667,
+    "ns": 0,
+    "title": "Площадь Борцов Революции (Владивосток)",
+    "lat": 43.115,
+    "lon": 131.886,
+    "dist": 324.7,
+    "primary": true
+   },
+   {
+    "pageid": 1,
+    "ns": 0,
+    "title": "Сломанная",
+    "lat": "43.1",
+    "lon": null,
+    "dist": 1
+   }
+  ]
+ }
+}

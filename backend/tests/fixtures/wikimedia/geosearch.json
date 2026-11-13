@@ -1,0 +1,303 @@
+{
+ "batchcomplete": true,
+ "query": {
+  "pages": [
+   {
+    "pageid": 79372,
+    "ns": 6,
+    "title": "File:Tokarevsky lighthouse.jpg",
+    "index": 1,
+    "coordinates": [
+     {
+      "lat": 43.0738,
+      "lon": 131.8455,
+      "primary": true,
+      "globe": "earth"
+     }
+    ],
+    "imageinfo": [
+     {
+      "size": 123,
+      "width": 4000,
+      "height": 3000,
+      "thumburl": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/X.jpg/1280px-X.jpg",
+      "thumbwidth": 1280,
+      "thumbheight": 960,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/a/ab/X.jpg",
+      "descriptionurl": "https://commons.wikimedia.org/wiki/File:Tokarevsky_lighthouse.jpg",
+      "mime": "image/jpeg",
+      "extmetadata": {
+       "Artist": {
+        "value": "<a href=\"//commons.wikimedia.org/wiki/User:Example\">Иван Фотограф</a>",
+        "source": "commons-desc-page"
+       },
+       "LicenseShortName": {
+        "value": "CC BY-SA 4.0",
+        "source": "commons-desc-page"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "pageid": 42266,
+    "ns": 6,
+    "title": "File:Lighthouse at dusk.png",
+    "index": 1,
+    "coordinates": [
+     {
+      "lat": 43.074,
+      "lon": 131.846,
+      "primary": true,
+      "globe": "earth"
+     }
+    ],
+    "imageinfo": [
+     {
+      "size": 123,
+      "width": 4000,
+      "height": 3000,
+      "thumburl": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/X.jpg/1280px-X.jpg",
+      "thumbwidth": 1280,
+      "thumbheight": 960,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/a/ab/X.jpg",
+      "descriptionurl": "https://commons.wikimedia.org/wiki/File:Lighthouse_at_dusk.png",
+      "mime": "image/png",
+      "extmetadata": {
+       "Artist": {
+        "value": "",
+        "source": "commons-desc-page"
+       },
+       "LicenseShortName": {
+        "value": "CC0",
+        "source": "commons-desc-page"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "pageid": 32629,
+    "ns": 6,
+    "title": "File:Vladivostok locator map.svg",
+    "index": 1,
+    "coordinates": [
+     {
+      "lat": 43.0738,
+      "lon": 131.8455,
+      "primary": true,
+      "globe": "earth"
+     }
+    ],
+    "imageinfo": [
+     {
+      "size": 123,
+      "width": 4000,
+      "height": 3000,
+      "thumburl": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/X.jpg/1280px-X.jpg",
+      "thumbwidth": 1280,
+      "thumbheight": 960,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/a/ab/X.jpg",
+      "descriptionurl": "https://commons.wikimedia.org/wiki/File:Vladivostok_locator_map.svg",
+      "mime": "image/svg+xml",
+      "extmetadata": {
+       "Artist": {
+        "value": "<a href=\"//commons.wikimedia.org/wiki/User:Example\">Иван Фотограф</a>",
+        "source": "commons-desc-page"
+       },
+       "LicenseShortName": {
+        "value": "CC BY-SA 4.0",
+        "source": "commons-desc-page"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "pageid": 13216,
+    "ns": 6,
+    "title": "File:Map of Egersheld.jpg",
+    "index": 1,
+    "coordinates": [
+     {
+      "lat": 43.0738,
+      "lon": 131.8455,
+      "primary": true,
+      "globe": "earth"
+     }
+    ],
+    "imageinfo": [
+     {
+      "size": 123,
+      "width": 4000,
+      "height": 3000,
+      "thumburl": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/X.jpg/1280px-X.jpg",
+      "thumbwidth": 1280,
+      "thumbheight": 960,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/a/ab/X.jpg",
+      "descriptionurl": "https://commons.wikimedia.org/wiki/File:Map_of_Egersheld.jpg",
+      "mime": "image/jpeg",
+      "extmetadata": {
+       "Artist": {
+        "value": "<a href=\"//commons.wikimedia.org/wiki/User:Example\">Иван Фотограф</a>",
+        "source": "commons-desc-page"
+       },
+       "LicenseShortName": {
+        "value": "CC BY-SA 4.0",
+        "source": "commons-desc-page"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "pageid": 43461,
+    "ns": 6,
+    "title": "File:Tiny.jpg",
+    "index": 1,
+    "coordinates": [
+     {
+      "lat": 43.0738,
+      "lon": 131.8455,
+      "primary": true,
+      "globe": "earth"
+     }
+    ],
+    "imageinfo": [
+     {
+      "size": 123,
+      "width": 320,
+      "height": 240,
+      "thumburl": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/X.jpg/1280px-X.jpg",
+      "thumbwidth": 1280,
+      "thumbheight": 960,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/a/ab/X.jpg",
+      "descriptionurl": "https://commons.wikimedia.org/wiki/File:Tiny.jpg",
+      "mime": "image/jpeg",
+      "extmetadata": {
+       "Artist": {
+        "value": "<a href=\"//commons.wikimedia.org/wiki/User:Example\">Иван Фотограф</a>",
+        "source": "commons-desc-page"
+       },
+       "LicenseShortName": {
+        "value": "CC BY-SA 4.0",
+        "source": "commons-desc-page"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "pageid": 21262,
+    "ns": 6,
+    "title": "File:Unlicensed.jpg",
+    "index": 1,
+    "coordinates": [
+     {
+      "lat": 43.0738,
+      "lon": 131.8455,
+      "primary": true,
+      "globe": "earth"
+     }
+    ],
+    "imageinfo": [
+     {
+      "size": 123,
+      "width": 4000,
+      "height": 3000,
+      "thumburl": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/X.jpg/1280px-X.jpg",
+      "thumbwidth": 1280,
+      "thumbheight": 960,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/a/ab/X.jpg",
+      "descriptionurl": "https://commons.wikimedia.org/wiki/File:Unlicensed.jpg",
+      "mime": "image/jpeg",
+      "extmetadata": {
+       "Artist": {
+        "value": "<a href=\"//commons.wikimedia.org/wiki/User:Example\">Иван Фотограф</a>",
+        "source": "commons-desc-page"
+       },
+       "LicenseShortName": {
+        "value": "",
+        "source": "commons-desc-page"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "pageid": 21049,
+    "ns": 6,
+    "title": "File:Http only.jpg",
+    "index": 1,
+    "coordinates": [
+     {
+      "lat": 43.0738,
+      "lon": 131.8455,
+      "primary": true,
+      "globe": "earth"
+     }
+    ],
+    "imageinfo": [
+     {
+      "size": 123,
+      "width": 4000,
+      "height": 3000,
+      "thumburl": "http://example.org/x.jpg",
+      "thumbwidth": 1280,
+      "thumbheight": 960,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/a/ab/X.jpg",
+      "descriptionurl": "https://commons.wikimedia.org/wiki/File:Http_only.jpg",
+      "mime": "image/jpeg",
+      "extmetadata": {
+       "Artist": {
+        "value": "<a href=\"//commons.wikimedia.org/wiki/User:Example\">Иван Фотограф</a>",
+        "source": "commons-desc-page"
+       },
+       "LicenseShortName": {
+        "value": "CC BY-SA 4.0",
+        "source": "commons-desc-page"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "pageid": 64226,
+    "ns": 6,
+    "title": "File:Script author.jpg",
+    "index": 1,
+    "coordinates": [
+     {
+      "lat": 43.0738,
+      "lon": 131.8455,
+      "primary": true,
+      "globe": "earth"
+     }
+    ],
+    "imageinfo": [
+     {
+      "size": 123,
+      "width": 4000,
+      "height": 3000,
+      "thumburl": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/X.jpg/1280px-X.jpg",
+      "thumbwidth": 1280,
+      "thumbheight": 960,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/a/ab/X.jpg",
+      "descriptionurl": "https://commons.wikimedia.org/wiki/File:Script_author.jpg",
+      "mime": "image/jpeg",
+      "extmetadata": {
+       "Artist": {
+        "value": "<script>alert(1)</script>Пётр <b>Снимков</b>",
+        "source": "commons-desc-page"
+       },
+       "LicenseShortName": {
+        "value": "CC BY 3.0",
+        "source": "commons-desc-page"
+       }
+      }
+     }
+    ]
+   }
+  ]
+ }
+}

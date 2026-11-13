@@ -1,0 +1,60 @@
+[project]
+name = "mayak-backend"
+version = "1.0.0"
+description = "Маяк — народная карта Владивостока: backend API"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "aiosqlite>=0.20",
+    "fastapi>=0.115",
+    "httpx[socks]>=0.28",
+    "pillow>=10.4",
+    "pwdlib[argon2]>=0.2.1",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.5",
+    "pyjwt>=2.9",
+    "python-multipart>=0.0.12",
+    "selectolax>=1.0.2",
+    "shapely>=2.2.0",
+    "sqlalchemy[asyncio]>=2.0.35",
+    "uvicorn[standard]>=0.32",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.7",
+    "time-machine>=2.16",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "RUF", "ASYNC", "PT", "RET", "PL"]
+ignore = [
+    "RUF001",  # Cyrillic letters in user-facing strings are intentional
+    "RUF002",
+    "RUF003",
+    "PLR0913", # use-case functions legitimately take several arguments
+    "PLR0917",
+    "PLR2004", # magic-number rule is too noisy for tests and HTTP codes
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["PLR0915"]
+"app/seed/**" = ["E501"]
+"tests/vlru/test_parsers.py" = ["PLR0915", "E501"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.File", "fastapi.Body"]

@@ -1,0 +1,15 @@
+wikivoyage_snapshot.json — listings of the travel guide Wikivoyage («Викигид») for «Маяк» (SPEC §21)
+
+Source: the Russian Wikivoyage articles «Владивосток» and «Остров Русский»
+(https://ru.wikivoyage.org/wiki/Владивосток, https://ru.wikivoyage.org/wiki/Остров_Русский).
+Text © Wikivoyage contributors (authors are listed in the history of each article), available
+under the Creative Commons Attribution-ShareAlike licence 4.0:
+https://creativecommons.org/licenses/by-sa/4.0/
+
+Fetched once through the MediaWiki API (`action=parse&prop=wikitext`, one request per article);
+the `{{listing}}` templates were reduced to plain-text fields (name, alternative name, kind,
+coordinates, Wikidata id, Commons image, address, opening hours, description). Regenerate with
+`uv run python -m app.wikivoyage_import --fetch`.
+
+The app shows every text taken from here with «Текст: Викигид, CC BY-SA 4.0» and a link to the
+article; places created from it are marked «Викигид». Adapted texts stay under CC BY-SA 4.0.
