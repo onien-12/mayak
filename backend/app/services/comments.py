@@ -68,12 +68,14 @@ async def insert_comment(
     return comment
 
 
-async def add_comment(session: AsyncSession, author: User, place_id: int, payload: CommentIn) -> CommentOut:
-    now = utcnow()
-    place = await place_queries.get_visible_place(session, place_id, author)
-    content.ensure_clean_text(payload.text)
+async def post_comment(
+    session: AsyncSession, place: Place, author: User, text: str, now: datetime
+) -> Comment:
+    """A person's comment, hidden from everyone else until the screening releases it (SPEC §24.1).
+    The text must have passed `content.ensure_clean_text`; the caller commits and submits the
+    comment to the screener."""
     screened = not author.is_staff
-    comment = await insert_comment(session, place, author, payload.text, now, screened=screened)
+    comment = await insert_comment(session, place, author, text, now, screened=screened)
     if screened:
         await quiet_holds.open_window(
             session,
@@ -81,8 +83,16 @@ async def add_comment(session: AsyncSession, author: User, place_id: int, payloa
             comment.id,
             author.id,
             now=now,
-            heuristic_reasons=content.gibberish_reasons({"текст": payload.text}),
+            heuristic_reasons=content.gibberish_reasons({"текст": text}),
         )
+    return comment
+
+
+async def add_comment(session: AsyncSession, author: User, place_id: int, payload: CommentIn) -> CommentOut:
+    now = utcnow()
+    place = await place_queries.get_visible_place(session, place_id, author)
+    content.ensure_clean_text(payload.text)
+    comment = await post_comment(session, place, author, payload.text, now)
     await session.commit()
     return mappers.comment_out(comment, author)
 

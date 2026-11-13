@@ -1,8 +1,9 @@
 """Interests: topics of objects, a person's interest profile and how the two match (SPEC §23).
 
 Pure rules: the topic catalogue, rule tags (category, area kind, keyword lexicon), the weight of a
-topic for a person, match, the personal interest of an area, the recommendation score with its
-diversity rule and the affinity changes of every signal. Nothing here touches the database.
+topic for a person, match, the personal interest of an area, the recommendation score with the lead
+of residents' objects, its diversity rule and discoveries, and the affinity changes of every signal.
+Nothing here touches the database.
 """
 
 import hashlib
@@ -10,7 +11,7 @@ import math
 import re
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from enum import StrEnum
+from enum import IntEnum, StrEnum
 
 from app.domain.enums import AreaKind
 
@@ -415,15 +416,83 @@ def personal_interest(interest: int, match_value: float) -> int:
 # --- Recommendations (§23.5) --------------------------------------------------------------------
 
 MIN_MATCH = 0.15
+BARE_MIN_MATCH = 0.65
+"""An imported object with nothing to show, or a location with nothing residents made inside, needs
+a clearly stronger match to be recommended at all: in practice two of the person's topics (one
+chosen topic gives 0.48 at the category weight and at most 0.6)."""
 PER_LEADING_TOPIC = 3
-DISCOVERY_EVERY = 3
-"""Every third result is a discovery: a little-known object that matches, not the best-rated one."""
+PER_AREA_KIND = 2
+"""At most two locations of one kind lead the list: big squares must not fill it."""
+DISCOVERY_EVERY = 2
+"""Every second result is a discovery: a little-rated object that matches, not the best-rated one."""
+DISCOVERY_MAX_RATINGS = 2
 QUALITY_BASE = 0.6
 QUALITY_SHARE = 0.4
+IMPORTED_WEIGHT = 0.5
+"""Below `QUALITY_BASE`: at equal match a residents' object of the lowest quality still beats an
+imported one of the highest (0.6 > 0.5); an imported one needs at least 1.2× the match to overtake
+it, about 1.5× at ordinary qualities."""
+SUBSTANTIAL_USEFULNESS = 50
+EVENT_HOST_QUALITY = 1.0
+"""A location or a venue with a residents' upcoming event that fits the person: as good as quality
+gets."""
 TRUSTED_EVENT_QUALITY = 1.0
 OTHER_EVENT_QUALITY = 0.7
 USEFULNESS_BASE = 0.7
 USEFULNESS_SHARE = 0.3
+
+
+class Provenance(StrEnum):
+    """Who an object comes from, as far as «Для вас» is concerned."""
+
+    COMMUNITY = "community"
+    """Made by a resident: no external source and not a system author."""
+    IMPORTED = "imported"
+    """From a catalogue (VL.ru, OpenStreetMap, Wikivoyage) and with something to show."""
+    BARE = "bare"
+    """Imported with nothing to show, or a location with nothing residents made inside."""
+
+
+def place_provenance(
+    *, community: bool, described: bool, pictured: bool, usefulness: int | None
+) -> Provenance:
+    """A place or an event: a description, a photo or a known usefulness of 50+ is something to show."""
+    if community:
+        return Provenance.COMMUNITY
+    useful = usefulness is not None and usefulness >= SUBSTANTIAL_USEFULNESS
+    return Provenance.IMPORTED if described or pictured or useful else Provenance.BARE
+
+
+def area_provenance(community_places: int, community_events: int) -> Provenance:
+    """A location is the residents' when they made something inside it: a place or an upcoming
+    event. Who drew the territory does not matter — an imported square stays bare until then."""
+    return Provenance.COMMUNITY if community_places > 0 or community_events > 0 else Provenance.BARE
+
+
+def min_match(provenance: Provenance) -> float:
+    return BARE_MIN_MATCH if provenance is Provenance.BARE else MIN_MATCH
+
+
+def provenance_weight(provenance: Provenance) -> float:
+    return 1.0 if provenance is Provenance.COMMUNITY else IMPORTED_WEIGHT
+
+
+def event_leads(event_match: float) -> bool:
+    """A residents' upcoming event that fits the person makes the location it is inside, or the
+    place that is its venue, recommended for it — with the event as the reason and
+    `EVENT_HOST_QUALITY`."""
+    return event_match >= MIN_MATCH
+
+
+def is_discovery(rating_count: int) -> bool:
+    """Little-rated: two ratings at most."""
+    return rating_count <= DISCOVERY_MAX_RATINGS
+
+
+def discovery_rank(provenance: Provenance, match_value: float) -> tuple[int, float]:
+    """Residents' discoveries first, then by how well they fit (in steps of 0.1, so equals can
+    take turns)."""
+    return (0 if provenance is Provenance.COMMUNITY else 1, -round(match_value, 1))
 
 
 def area_quality(interest: int) -> float:
@@ -449,9 +518,12 @@ def with_usefulness(quality: float, usefulness: int | None) -> float:
     return quality * (USEFULNESS_BASE + USEFULNESS_SHARE * clamp_weight(usefulness / 100))
 
 
-def score(match_value: float, quality: float) -> float:
-    """Quality only nudges: score = match · (0.6 + 0.4 · quality)."""
-    return match_value * (QUALITY_BASE + QUALITY_SHARE * clamp_weight(quality))
+def score(match_value: float, quality: float, provenance: Provenance = Provenance.COMMUNITY) -> float:
+    """Quality only nudges, residents lead: score = match · (0.6 + 0.4 · quality) · weight, the
+    weight 1 for residents' objects and 0.5 for imported ones."""
+    return (
+        match_value * (QUALITY_BASE + QUALITY_SHARE * clamp_weight(quality)) * provenance_weight(provenance)
+    )
 
 
 def diversify[T](ranked: Iterable[T], leading_topic: Callable[[T], Topic], limit: int) -> list[T]:
@@ -496,37 +568,70 @@ def without_repeats[T](ranked: Iterable[T], key: Callable[[T], str]) -> list[T]:
     return kept
 
 
+class _Caps(IntEnum):
+    """How strictly `arrange` applies its caps; it relaxes them in this order."""
+
+    NONE = 0
+    KIND = 1
+    """Only the cap per area kind: the passed-over ones of a topic follow before a third square."""
+    ALL = 2
+
+
 def arrange[T](
     ranked: Sequence[T],
     leading_topic: Callable[[T], Topic],
     discoveries: Sequence[T],
     limit: int,
+    area_kind: Callable[[T], str | None] = lambda item: None,
+    by_residents: Callable[[T], bool] = lambda item: True,
 ) -> list[T]:
-    """`diversify`, with every third place given to the next discovery (those already in order).
+    """`diversify`, with every second place given to the next discovery (those already in order)
+    and at most `PER_AREA_KIND` locations of one kind (`area_kind` is None for anything else).
 
     Quality pulls the well-known to the top; the discoveries are how a niche object that fits is
-    seen at all. They obey the same cap per leading topic. Without discoveries this is exactly
-    `diversify`.
+    seen at all — the first comes second. They obey the same caps. When the caps leave room, the
+    passed-over results follow by rank — those of a full topic first, the locations of a full kind
+    last; discoveries keep their places then too. An imported discovery never takes the place of
+    a residents' result. Without discoveries and kinds this is exactly `diversify`.
     """
     taken: list[T] = []
     used: set[int] = set()
     per_topic: dict[Topic, int] = {}
+    per_kind: dict[str, int] = {}
 
-    def take(pool: Sequence[T], *, capped: bool) -> bool:
-        for item in pool:
-            topic = leading_topic(item)
-            if id(item) in used or (capped and per_topic.get(topic, 0) >= PER_LEADING_TOPIC):
-                continue
-            used.add(id(item))
-            per_topic[topic] = per_topic.get(topic, 0) + 1
-            taken.append(item)
-            return True
-        return False
+    def allowed(item: T, caps: _Caps) -> bool:
+        kind = area_kind(item)
+        if caps >= _Caps.KIND and kind is not None and per_kind.get(kind, 0) >= PER_AREA_KIND:
+            return False
+        return caps < _Caps.ALL or per_topic.get(leading_topic(item), 0) < PER_LEADING_TOPIC
+
+    def pick(pool: Sequence[T], caps: _Caps) -> T | None:
+        return next((item for item in pool if id(item) not in used and allowed(item, caps)), None)
+
+    def take(item: T) -> None:
+        used.add(id(item))
+        topic, kind = leading_topic(item), area_kind(item)
+        per_topic[topic] = per_topic.get(topic, 0) + 1
+        if kind is not None:
+            per_kind[kind] = per_kind.get(kind, 0) + 1
+        taken.append(item)
 
     while len(taken) < limit:
-        wants_discovery = (len(taken) + 1) % DISCOVERY_EVERY == 0
-        if wants_discovery and take(discoveries, capped=True):
-            continue
-        if not (take(ranked, capped=True) or take(ranked, capped=False)):
+        regular = pick(ranked, _Caps.ALL)
+        within_caps = regular is not None
+        for caps in (_Caps.KIND, _Caps.NONE):
+            if regular is None:
+                regular = pick(ranked, caps)
+        if (len(taken) + 1) % DISCOVERY_EVERY == 0:
+            discovery = pick(discoveries, _Caps.ALL)
+            if discovery is None and not within_caps:
+                discovery = pick(discoveries, _Caps.KIND)
+            if discovery is not None and not (
+                regular is not None and by_residents(regular) and not by_residents(discovery)
+            ):
+                take(discovery)
+                continue
+        if regular is None:
             break
+        take(regular)
     return taken

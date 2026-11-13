@@ -79,7 +79,7 @@ function CaseBody({ detail, queue }: { detail: ModerationCaseDetail; queue: Queu
           {detail.ai_review && <AiReviewCard review={detail.ai_review} />}
           <PhotoReviewsCard reviews={detail.photo_reviews} />
           {detail.target_type === 'place' || detail.target_type === 'route' ? (
-            <TargetPreview place={detail.place} route={detail.route} />
+            <TargetPreview place={detail.place} route={detail.route} quest={detail.quest} />
           ) : (
             <p className="rounded-card bg-canvas p-4 text-sm text-ink-soft">
               {HELD_KIND_LABELS[detail.target_type]}: такие элементы выпускают или убирают во

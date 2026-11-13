@@ -76,6 +76,7 @@ overlay page over the map.
 | `/?place=<id>` | place card on top of any panel section (query param works on `/`, `/events`, `/routes/*`, `/saved`, `/collections/*`) | panel |
 | `/events` | Афиша | panel |
 | `/routes`, `/routes/:id`, `/routes/new`, `/routes/:id/edit` | Маршруты | panel |
+| `/routes?view=quests`, `/quests/:id`, `/quests/new`, `/quests/:id/edit`, `/quests/play/:runId`, `/quests/join/:code` | Маршруты → Квесты (SPEC §27) | panel |
 | `/saved`, `/collections/:id` | Избранное и подборки | panel |
 | `/users/:id` (`/profile` → own) | Профиль | overlay page |
 | `/moderation`, `/moderation/:caseId` | Модерация (mods only) | overlay page |

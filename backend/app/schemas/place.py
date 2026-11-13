@@ -10,6 +10,7 @@ from pydantic import (
     model_validator,
 )
 
+from app.domain import event_formats
 from app.domain.attributes import AttributeValue
 from app.domain.enums import (
     EventPhase,
@@ -354,6 +355,17 @@ class EventUpdate(EventFields):
     ends_at: UtcDatetime | None = None
     is_cancelled: bool | None = None
     registration_closed: bool | None = None
+
+
+class EventJoinInput(ApiModel):
+    note: (
+        Annotated[
+            str,
+            StringConstraints(strip_whitespace=True, min_length=1, max_length=event_formats.NOTE_MAX_LENGTH),
+        ]
+        | None
+    ) = None
+    """Swap only: what the participant brings, posted as a comment in the discussion."""
 
 
 class IssueInput(ApiModel):

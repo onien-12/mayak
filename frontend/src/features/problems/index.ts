@@ -1,0 +1,1 @@
+export { OutagesRedirect } from './OutagesRedirect';

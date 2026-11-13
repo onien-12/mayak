@@ -2,26 +2,32 @@ import { LocateFixed, MapPinned, Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { usePickPoint, useUserLocation } from '@/features/map';
+import type { PlaceCard } from '@/shared/api';
 import { useAddressSuggest, useIsDesktop } from '@/shared/hooks';
 import { formatCoords, VLADIVOSTOK_CENTER, type LatLng } from '@/shared/lib/geo';
 import { Button, Input, PanelLayout, usePanelStore, useSheetPeek } from '@/shared/ui';
 
 import type { StepFrame } from './StepFrame';
+import { VenuePicks } from './VenuePicks';
 
 /** Phone: sheet height that keeps the hint and the confirm button visible over the map. */
 const PICK_PEEK_PX = 300;
+/** Phone: taller when venues nearby are offered, so the first of them shows too. */
+const VENUE_PEEK_PX = 440;
 
 interface PointStepProps {
   frame: StepFrame;
   initial: LatLng | undefined;
   onConfirm: (point: LatLng, address: string | undefined) => void;
+  /** Events: offer the venues near the pin; picking one is the answer to «где». */
+  onPickVenue?: (venue: PlaceCard) => void;
 }
 
 /**
  * Step 3: where is it? The pin is fixed in the centre of the visible map — the user moves
  * the map under it, taps the map, jumps to their location or searches for an address.
  */
-export function PointStep({ frame, initial, onConfirm }: PointStepProps) {
+export function PointStep({ frame, initial, onConfirm, onPickVenue }: PointStepProps) {
   const isDesktop = useIsDesktop();
   const showMap = usePanelStore((state) => state.showMap);
   const { point, moveTo } = usePickPoint(true, initial);
@@ -30,7 +36,7 @@ export function PointStep({ frame, initial, onConfirm }: PointStepProps) {
   const [address, setAddress] = useState<string>();
   const { suggestions } = useAddressSuggest(query, point ?? VLADIVOSTOK_CENTER);
 
-  useSheetPeek(isDesktop ? null : PICK_PEEK_PX);
+  useSheetPeek(isDesktop ? null : onPickVenue ? VENUE_PEEK_PX : PICK_PEEK_PX);
   useEffect(() => showMap(), [showMap]);
 
   const toMyLocation = async () => {
@@ -62,6 +68,7 @@ export function PointStep({ frame, initial, onConfirm }: PointStepProps) {
             </span>
           )}
         </p>
+        {onPickVenue && <VenuePicks around={point ?? VLADIVOSTOK_CENTER} onPick={onPickVenue} />}
         <Button
           variant="secondary"
           icon={LocateFixed}

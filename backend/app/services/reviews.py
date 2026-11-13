@@ -185,14 +185,19 @@ async def review_place(session: AsyncSession, author: User, place_id: int, paylo
     return ReviewOut.model_validate(review)
 
 
-async def list_route_reviews(session: AsyncSession, route_id: int, viewer: User | None) -> list[ReviewOut]:
-    route = await routes.get_visible_route(session, route_id, viewer)
+async def list_route_reviews(
+    session: AsyncSession, route_id: int, viewer: User | None, *, quest_ok: bool = False
+) -> list[ReviewOut]:
+    route = await routes.get_visible_route(session, route_id, viewer, quest_ok=quest_ok)
     return await _list(session, Review.route_id == route.id, viewer)
 
 
-async def review_route(session: AsyncSession, author: User, route_id: int, payload: ReviewIn) -> ReviewOut:
+async def review_route(
+    session: AsyncSession, author: User, route_id: int, payload: ReviewIn, *, quest_ok: bool = False
+) -> ReviewOut:
+    """`quest_ok`: a quest's review (SPEC §27), after the quest checked who may leave one."""
     now = utcnow()
-    route = await routes.get_public_route(session, route_id, author)
+    route = await routes.get_public_route(session, route_id, author, quest_ok=quest_ok)
     if route.author_id == author.id:
         raise ForbiddenError("Нельзя оценивать собственный маршрут.")
     content.ensure_clean_text(payload.text)

@@ -12,6 +12,7 @@ import {
 } from '@/features/map';
 import { ApiError, type PlaceDetail } from '@/shared/api';
 import { formatDistance } from '@/shared/lib/format';
+import { FORMAT_SLUGS, SWAP_FACTS, VENUE_FACTS } from '@/shared/lib/eventFormats';
 import { haversine } from '@/shared/lib/geo';
 import { LAYER_META } from '@/shared/lib/labels';
 import { TONES } from '@/shared/lib/tones';
@@ -43,6 +44,7 @@ import { PinLegend } from './PinLegend';
 import { StatusBanners } from './StatusBanners';
 import { TrustBlock } from './TrustBlock';
 import { usePlace } from './usePlace';
+import { VenueSection } from './VenueSection';
 import { VerificationBlock } from './VerificationBlock';
 
 const FOCUS_ZOOM = 15;
@@ -75,6 +77,8 @@ function PlaceBody({ place }: { place: PlaceDetail }) {
   const layer = LAYER_META[place.layer];
   const compact = hasCompactCard(place);
   const distance = location ? formatDistance(haversine(location.point, place)) : null;
+  const isVenue = place.category.slug === FORMAT_SLUGS.venue;
+  const isSwap = place.category.slug === FORMAT_SLUGS.swap;
 
   const startMeetup = () =>
     requireAuth(
@@ -125,6 +129,7 @@ function PlaceBody({ place }: { place: PlaceDetail }) {
         <StatusBanners place={place} onAppeal={() => setAppealing(true)} />
         {place.layer === 'event' && <EventSection place={place} />}
         {place.layer === 'issue' && <IssueSection place={place} />}
+        {isVenue && <VenueSection place={place} onHold={startMeetup} />}
 
         {place.description && (
           <div className="flex flex-col gap-1.5">
@@ -139,7 +144,10 @@ function PlaceBody({ place }: { place: PlaceDetail }) {
             <VerificationBlock place={place} />
           </>
         )}
-        <AttributesBlock place={place} />
+        <AttributesBlock
+          place={place}
+          omit={isVenue ? VENUE_FACTS : isSwap ? SWAP_FACTS : undefined}
+        />
         {hasPresenceElsewhere(place) && (
           <ElsewhereLinks
             title={place.title}
@@ -151,7 +159,7 @@ function PlaceBody({ place }: { place: PlaceDetail }) {
         {!compact && (
           <div className="flex flex-wrap gap-2">
             <AddPhotosButton place={place} />
-            {place.layer === 'infrastructure' && (
+            {place.layer === 'infrastructure' && !isVenue && (
               <Button variant="soft" icon={CalendarPlus} onClick={startMeetup}>
                 Создать встречу здесь
               </Button>

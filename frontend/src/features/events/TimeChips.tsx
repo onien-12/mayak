@@ -1,5 +1,5 @@
 import { CalendarRange, History } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 
 import { cn } from '@/shared/lib/cn';
 import { Chip } from '@/shared/ui';
@@ -9,15 +9,11 @@ import { useEventsFilters } from './filtersStore';
 import { formatRange, TIME_PRESETS } from './period';
 
 interface TimeChipsProps {
-  /** Extra chips before the periods (e.g. «Фильтры» over the map). */
-  leading?: ReactNode;
-  /** Floating over the map: chips get a card shadow. */
-  floating?: boolean;
   className?: string;
 }
 
 /** Horizontally scrollable period chips: «Сегодня», «Завтра», «Выходные»… and custom dates. */
-export function TimeChips({ leading, floating = false, className }: TimeChipsProps) {
+export function TimeChips({ className }: TimeChipsProps) {
   const time = useEventsFilters((state) => state.time);
   const range = useEventsFilters((state) => state.range);
   const past = useEventsFilters((state) => state.past);
@@ -29,14 +25,7 @@ export function TimeChips({ leading, floating = false, className }: TimeChipsPro
 
   return (
     <>
-      <div
-        className={cn(
-          'no-scrollbar flex gap-2 overflow-x-auto',
-          floating && '[&>*]:shadow-card',
-          className,
-        )}
-      >
-        {leading}
+      <div className={cn('no-scrollbar flex gap-2 overflow-x-auto', className)}>
         {past ? (
           <Chip icon={History} tone="event" selected onRemove={togglePast}>
             Прошедшие
@@ -48,19 +37,12 @@ export function TimeChips({ leading, floating = false, className }: TimeChipsPro
               tone="event"
               selected={time === preset.value}
               onClick={() => setTime(preset.value)}
-              className={floating && time !== preset.value ? 'bg-surface text-ink' : undefined}
             >
               {preset.label}
             </Chip>
           ))
         )}
-        <Chip
-          icon={CalendarRange}
-          tone="event"
-          selected={custom}
-          onClick={() => setPicking(true)}
-          className={floating && !custom ? 'bg-surface text-ink' : undefined}
-        >
+        <Chip icon={CalendarRange} tone="event" selected={custom} onClick={() => setPicking(true)}>
           {custom ? formatRange(range) : 'Даты'}
         </Chip>
       </div>

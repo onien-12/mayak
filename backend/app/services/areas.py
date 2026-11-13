@@ -1,12 +1,12 @@
 """Areas: named locations with exact polygons that group the places inside them (SPEC §17)."""
 
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Row, or_, select, update
+from sqlalchemy import Row, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -23,7 +23,15 @@ from app.domain.geo import BBox
 from app.domain.geometry import Territory
 from app.domain.interests import InterestTarget, Profile, Topic
 from app.models import Area, EventDetails, IssueDetails, Photo, Place, User
-from app.schemas.area import AreaCard, AreaDetail, AreaInput, AreaUpdate, PersonalInterest, TerritoryInput
+from app.schemas.area import (
+    AreaCard,
+    AreaDetail,
+    AreaInput,
+    AreaUpdate,
+    CommunityEventRef,
+    PersonalInterest,
+    TerritoryInput,
+)
 from app.schemas.place import CombinedRating, PhotoOut
 from app.schemas.user import UserBrief
 from app.services import (
@@ -75,12 +83,74 @@ def personal_interest(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class CommunityEvents:
+    """Upcoming events residents made inside a location (SPEC §17), computed on read."""
+
+    count: int = 0
+    nearest: CommunityEventRef | None = None
+
+
+_NO_COMMUNITY_EVENTS = CommunityEvents()
+
+
+async def community_events(
+    session: AsyncSession, area_ids: Collection[int], now: datetime
+) -> dict[int, CommunityEvents]:
+    """Public, not finished and not cancelled residents' events inside the given areas, one query;
+    areas without any are left out."""
+    if not area_ids:
+        return {}
+    rows = await session.execute(
+        select(Place.area_id, Place.id, Place.title, Place.author_id, EventDetails.starts_at)
+        .join(EventDetails, EventDetails.place_id == Place.id)
+        .where(
+            Place.area_id.in_(area_ids),
+            Place.layer == Layer.EVENT,
+            Place.status.in_(PUBLIC_STATUSES),
+            place_queries.community_clause(),
+            EventDetails.ends_at >= now,
+            EventDetails.is_cancelled.is_(False),
+        )
+        .order_by(EventDetails.starts_at, Place.id)
+    )
+    found: dict[int, CommunityEvents] = {}
+    for row in rows:
+        known = found.get(row.area_id)
+        if known is None:
+            nearest = CommunityEventRef.of(row.id, row.title, row.starts_at, row.author_id)
+            found[row.area_id] = CommunityEvents(1, nearest)
+        else:
+            found[row.area_id] = CommunityEvents(known.count + 1, known.nearest)
+    return found
+
+
+async def community_places(session: AsyncSession, area_ids: Collection[int]) -> dict[int, int]:
+    """How many public places residents made inside each area (the layers an area counts)."""
+    if not area_ids:
+        return {}
+    rows = await session.execute(
+        select(Place.area_id, func.count())
+        .where(
+            Place.area_id.in_(area_ids),
+            Place.layer.in_(area_rules.COUNTED_LAYERS),
+            Place.status.in_(PUBLIC_STATUSES),
+            place_queries.community_clause(),
+        )
+        .group_by(Place.area_id)
+    )
+    return dict(rows.all())
+
+
 def _card_fields(
     area: Area,
     combined_rating: CombinedRating | None,
     personal: PersonalInterest | None,
     borrowed_cover: CatalogueCover | None = None,
+    community: CommunityEvents | None = None,
+    community_places_count: int = 0,
 ) -> dict[str, object]:
+    community = community or _NO_COMMUNITY_EVENTS
     return {
         "id": area.id,
         "title": area.title,
@@ -96,6 +166,11 @@ def _card_fields(
         "combined_rating": combined_rating,
         "highlights": area.highlights,
         "events_upcoming": area.events_upcoming,
+        "community_events_upcoming": community.count,
+        "next_community_event": community.nearest,
+        "bare_background": area_rules.is_bare_background(
+            area.external_source is not None, area.places_count, community_places_count, community.count
+        ),
         "issues_open": area.issues_open,
         "external": mappers.external_source(area),
         "personal_interest": personal,
@@ -366,10 +441,12 @@ async def list_areas(
 
 
 async def area_cards(session: AsyncSession, rows: Sequence[Area], profile: Profile | None) -> list[AreaCard]:
-    """Cards for a page of areas: blends, borrowed covers and, with a profile, the personal
-    interest, each loaded for the whole page."""
+    """Cards for a page of areas: blends, borrowed covers, residents' upcoming events and, with a
+    profile, the personal interest, each loaded for the whole page."""
     blends = await combined_ratings.for_areas(session, rows)
     borrowed = await covers.borrowed_for_areas(session, rows)
+    community = await community_events(session, [area.id for area in rows], utcnow())
+    made_inside = await community_places(session, [area.id for area in rows])
     tags = (
         await interest_tags.for_targets(
             session, InterestTarget.AREA, [area.id for area in rows], profile.keys()
@@ -384,6 +461,8 @@ async def area_cards(session: AsyncSession, rows: Sequence[Area], profile: Profi
                 blends.get(area.id),
                 personal_interest(area, profile, tags.get(area.id, {})),
                 borrowed.get(area.id),
+                community.get(area.id),
+                made_inside.get(area.id, 0),
             )
         )
         for area in rows
@@ -417,9 +496,16 @@ async def _build_detail(
     blends = await combined_ratings.for_areas(session, [area])
     borrowed = await covers.borrowed_for_areas(session, [area])
     tags = await interest_tags.for_target(session, InterestTarget.AREA, area.id)
+    community = await community_events(session, [area.id], now)
+    made_inside = await community_places(session, [area.id])
     return AreaDetail(
         **_card_fields(
-            area, blends.get(area.id), personal_interest(area, profile, tags), borrowed.get(area.id)
+            area,
+            blends.get(area.id),
+            personal_interest(area, profile, tags),
+            borrowed.get(area.id),
+            community.get(area.id),
+            made_inside.get(area.id, 0),
         ),
         description=area.description,
         description_credit=await text_credits.for_description(session, area),

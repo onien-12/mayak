@@ -3,14 +3,22 @@ import { createBrowserRouter } from 'react-router';
 
 import { RequireAuth } from '@/features/auth';
 import { ExplorePanel } from '@/features/explore';
+import { OutagesRedirect } from '@/features/problems';
 
 import {
   CasePage,
   CollectionPage,
   EventsPanel,
+  LostEditor,
+  LostItemPage,
+  LostPanel,
   ModerationPage,
-  OutagesPanel,
+  ProblemsPanel,
   ProfilePage,
+  QuestEditorPage,
+  QuestJoinPage,
+  QuestPage,
+  QuestRunPage,
   RouteBuilder,
   RoutePage,
   RoutePrintPage,
@@ -48,7 +56,17 @@ export const router = createBrowserRouter([
           { path: 'routes/new', element: <RouteBuilder /> },
           { path: 'routes/:id', element: <RoutePage /> },
           { path: 'routes/:id/edit', element: <RouteBuilder /> },
-          { path: 'outages', element: <OutagesPanel /> },
+          { path: 'quests/new', element: <QuestEditorPage /> },
+          { path: 'quests/join/:code', element: <QuestJoinPage /> },
+          { path: 'quests/play/:runId', element: <QuestRunPage /> },
+          { path: 'quests/:id', element: <QuestPage /> },
+          { path: 'quests/:id/edit', element: <QuestEditorPage /> },
+          { path: 'problems', element: <ProblemsPanel /> },
+          // The former «Отключения» section: old links open «Проблемы» with outages selected.
+          { path: 'outages', element: <OutagesRedirect /> },
+          { path: 'lost', element: <LostPanel /> },
+          { path: 'lost/new', element: <LostEditor /> },
+          { path: 'lost/:id', element: <LostItemPage /> },
           { path: 'saved', element: <SavedPanel /> },
           { path: 'collections/:id', element: <CollectionPage /> },
           { path: '*', element: <NotFoundPanel /> },

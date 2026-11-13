@@ -2,12 +2,14 @@ import type {
   Attributes,
   Category,
   EventInput,
+  FieldDef,
   IssueSeverity,
   Layer,
   PlaceDetail,
   PlaceInput,
   PlaceUpdate,
 } from '@/shared/api';
+import { FORMAT_SLUGS, SWAP_FACTS, VENUE_FACTS } from '@/shared/lib/eventFormats';
 import { fromLocalInputValue, toLocalInputValue } from '@/shared/lib/format';
 import type { LatLng } from '@/shared/lib/geo';
 
@@ -50,6 +52,32 @@ export interface PlaceDraft {
 }
 
 const HOUR_MS = 3_600_000;
+
+/** Facts a format asks up front instead of under «Подробности — по желанию» (SPEC §3.4). */
+const PRIMARY_FIELDS: Record<string, readonly string[]> = {
+  [FORMAT_SLUGS.swap]: SWAP_FACTS,
+  [FORMAT_SLUGS.venue]: VENUE_FACTS,
+};
+
+/** Answers a new place of the category starts with: a swap welcomes what people bring. */
+const DEFAULT_ATTRIBUTES: Record<string, PlaceFormValues['attributes']> = {
+  [FORMAT_SLUGS.swap]: { bring_own: true },
+};
+
+/** The category's fields split into those asked up front and the optional rest. */
+export function splitFields(category: Category): { primary: FieldDef[]; optional: FieldDef[] } {
+  const keys = PRIMARY_FIELDS[category.slug] ?? [];
+  return {
+    primary: category.fields.filter((field) => keys.includes(field.key)),
+    optional: category.fields.filter((field) => !keys.includes(field.key)),
+  };
+}
+
+/** Fresh form values for a new place of this category. */
+export function withCategoryDefaults(values: PlaceFormValues, category: Category): PlaceFormValues {
+  const defaults = DEFAULT_ATTRIBUTES[category.slug];
+  return defaults ? { ...values, attributes: { ...defaults, ...values.attributes } } : values;
+}
 
 function defaultEvent(preset: { isMeetup?: boolean }): PlaceFormValues['event'] {
   const start = new Date(Math.ceil((Date.now() + 2 * HOUR_MS) / HOUR_MS) * HOUR_MS);

@@ -14,7 +14,8 @@ const METER_DELAY_S = 0.15;
 
 /**
  * «How interesting is it»: the plain count of places (counting up), the tier label with
- * the 0–100 meter and what is going on here (the rating sits in the card's rating line).
+ * the 0–100 meter and what is going on here (the rating sits in the card's rating line; the
+ * events themselves are listed right below, in «Скоро здесь»).
  * A personal interest (SPEC §23.4) takes the tier and the meter, marked «для вас» with its
  * reasons; the general interest stays right under it.
  */

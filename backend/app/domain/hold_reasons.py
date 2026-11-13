@@ -51,6 +51,8 @@ _NOTICE_SUBJECTS: dict[AiTarget, tuple[str, str, str]] = {
     AiTarget.COMMENT: ("Комментарий к", "Комментарий", "прошёл"),
     AiTarget.REVIEW: ("Отзыв к", "Отзыв", "прошёл"),
     AiTarget.NOTE: ("Заметка", "Заметка на карте", "прошла"),
+    AiTarget.LOST_ITEM: ("Объявление", "Объявление в «Потеряшках»", "прошло"),
+    AiTarget.LOST_RESPONSE: ("Отклик к", "Отклик", "прошёл"),
 }
 """`(prefix before the title, subject without a title, verb ending)` per kind of item."""
 _PRONOUNS: dict[AiTarget, str] = {AiTarget.PLACE: "её", AiTarget.NOTE: "её"}
@@ -100,10 +102,11 @@ def _shorten(text: str, limit: int) -> str:
     return text if len(text) <= limit else f"{text[: limit - 1]}…"
 
 
-def notice_title(target_type: AiTarget, owner_title: str | None) -> str:
-    """«Комментарий к «Сквер» не прошёл автоматическую проверку»: the item and what it is about."""
-    prefix, bare, verb = _NOTICE_SUBJECTS[target_type]
-    subject = f"{prefix} «{_shorten(owner_title, _OWNER_TITLE_LIMIT)}»" if owner_title else bare
+def notice_title(target_type: AiTarget, owner_title: str | None, *, prefix: str | None = None) -> str:
+    """«Комментарий к «Сквер» не прошёл автоматическую проверку»: the item and what it is about.
+    `prefix` names the item when the kind's usual word does not fit («Квест» for a quest)."""
+    usual, bare, verb = _NOTICE_SUBJECTS[target_type]
+    subject = f"{prefix or usual} «{_shorten(owner_title, _OWNER_TITLE_LIMIT)}»" if owner_title else bare
     return _shorten(f"{subject} не {verb} автоматическую проверку", NOTICE_TITLE_LIMIT)
 
 

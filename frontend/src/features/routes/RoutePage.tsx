@@ -1,6 +1,6 @@
 import { Footprints, MapPinOff } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { Link, Navigate, useNavigate, useParams } from 'react-router';
 
 import { useMapActions } from '@/features/map';
 import type { RouteDetail } from '@/shared/api';
@@ -21,6 +21,7 @@ import { numberStops } from './lib/stops';
 import { RouteMapLayer } from './map/RouteMapLayer';
 import { RouteMenu } from './page/RouteActions';
 import { RouteOverview } from './page/RouteOverview';
+import { useQuest } from './quests/useQuests';
 import { isNotFound, parseRouteId, useRoute } from './useRoute';
 import { useWalkParam } from './walk/useWalkParam';
 import { WalkMode } from './walk/WalkMode';
@@ -97,6 +98,7 @@ export default function RoutePage() {
   const id = parseRouteId(useParams().id);
   const { walking, stopWalk } = useWalkParam();
   const route = useRoute(id);
+  const quest = useQuest(isNotFound(route.error) ? id : NaN);
 
   if (route.data) {
     if (walking) return <WalkMode key={route.data.id} route={route.data} onExit={stopWalk} />;
@@ -104,6 +106,8 @@ export default function RoutePage() {
   }
 
   const missing = Number.isNaN(id) || isNotFound(route.error);
+  // A quest is a route underneath (SPEC §27): old links to its route id open the quest.
+  if (missing && quest.data) return <Navigate to={`/quests/${quest.data.id}`} replace />;
 
   return (
     <PanelLayout title="Маршрут" onBack={() => navigate('/routes')} backLabel="К маршрутам">

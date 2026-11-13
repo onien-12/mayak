@@ -37,6 +37,8 @@ interface PlaceListItemProps {
   hideArea?: boolean;
   /** Recommended to the viewer: a quiet «для вас» mark next to the category. */
   forYou?: boolean;
+  /** A quiet line under the layer meta («сообщили 2 дня назад»). */
+  note?: ReactNode;
   className?: string;
 }
 
@@ -62,7 +64,6 @@ function EventMeta({ place }: { place: PlaceCard }) {
             {formatPrice(event.price, event.price_note)}
           </Badge>
         )}
-        {event.is_meetup && <Badge tone="event">Встреча</Badge>}
         {place.external && <ExternalBadge external={place.external} />}
       </div>
     </>
@@ -104,6 +105,7 @@ export function PlaceListItem({
   trailing,
   hideArea = false,
   forYou = false,
+  note,
   className,
 }: PlaceListItemProps) {
   const { byId } = useCategories();
@@ -177,6 +179,7 @@ export function PlaceListItem({
           </p>
         )}
         {place.layer === 'issue' && <IssueMeta place={place} />}
+        {note && <p className="truncate text-xs text-ink-faint">{note}</p>}
         <div className="mt-auto flex items-center gap-2 pt-0.5">
           {place.external && isUnconfirmedImport(place) ? (
             <ExternalBadge external={place.external} />

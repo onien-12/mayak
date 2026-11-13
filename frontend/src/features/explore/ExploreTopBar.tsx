@@ -1,10 +1,10 @@
 import { Accessibility, SlidersHorizontal, Wallet } from 'lucide-react';
 
 import { NotesToggle } from '@/features/spot';
-import { LAYER_META, LAYERS } from '@/shared/lib/labels';
+import { LAYER_META } from '@/shared/lib/labels';
 import { Chip, MapTopBar, usePanelStore } from '@/shared/ui';
 
-import { useExploreFilters } from './filtersStore';
+import { MAP_LAYERS, useExploreFilters } from './filtersStore';
 import { HomeChip } from './HomeChip';
 import { SearchField } from './SearchField';
 
@@ -37,7 +37,7 @@ export function ExploreTopBar({ activeFilters, onOpenFilters }: ExploreTopBarPro
           </Chip>
           <NotesToggle />
           <HomeChip className="bg-surface text-ink" />
-          {LAYERS.map((layer) => (
+          {MAP_LAYERS.map((layer) => (
             <Chip
               key={layer}
               tone={LAYER_META[layer].tone}

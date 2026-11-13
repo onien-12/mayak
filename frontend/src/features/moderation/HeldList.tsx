@@ -71,7 +71,11 @@ function HeldCard({
           {item.text}
         </p>
       )}
-      {item.object_name && <p className="text-sm text-ink-soft">У объекта «{item.object_name}»</p>}
+      {item.object_name && (
+        <p className="text-sm text-ink-soft">
+          {item.kind === 'lost_response' ? 'К объявлению' : 'У объекта'} «{item.object_name}»
+        </p>
+      )}
       {owner && (
         <Link
           to={owner.to}

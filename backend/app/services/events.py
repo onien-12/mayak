@@ -10,12 +10,13 @@ from sqlalchemy.orm import joinedload
 
 from app.core.clock import utcnow
 from app.core.errors import BadRequestError, ConflictError, FieldValidationError
-from app.domain import event_phase, geo
-from app.domain.enums import PUBLIC_STATUSES, Layer, NotificationKind, PlaceStatus
-from app.models import EventDetails, EventParticipant, Place, User
+from app.domain import event_formats, event_phase, geo
+from app.domain.enums import PUBLIC_STATUSES, AiTarget, EventPhase, Layer, NotificationKind, PlaceStatus
+from app.models import Comment, EventDetails, EventParticipant, Place, User
+from app.schemas.feedback import EventContribution
 from app.schemas.place import EventUpdate, PlaceCard, PlaceDetail
 from app.schemas.user import UserBrief
-from app.services import mappers, notifications, place_details, place_queries
+from app.services import comments, content, mappers, notifications, place_details, place_queries, quiet_holds
 from app.services.interests import signals as interest_signals
 from app.services.place_queries import Origin
 
@@ -187,26 +188,66 @@ async def add_participant(session: AsyncSession, place: Place, user: User, now: 
     return True
 
 
-async def join(session: AsyncSession, user: User, place_id: int) -> PlaceDetail:
+@dataclass(frozen=True, slots=True)
+class Joined:
+    detail: PlaceDetail
+    note_id: int | None
+    """The comment that says what the participant brings; the caller submits it to the screener."""
+
+
+def _check_note(place: Place, note: str, phase: EventPhase) -> None:
+    refusal = event_formats.note_refusal(place.category.slug, place.attributes)
+    if refusal is not None:
+        raise FieldValidationError("note", refusal)
+    if phase in (EventPhase.FINISHED, EventPhase.CANCELLED):
+        raise ConflictError(event_formats.join_refusal(place.category.slug, "Событие уже завершилось."))
+    content.ensure_clean_text(note)
+
+
+async def _post_note(session: AsyncSession, place: Place, user: User, note: str, now: datetime) -> int | None:
+    """What the participant brings goes to the discussion, screened like any comment; the same
+    words twice are not repeated."""
+    text = event_formats.bring_comment(note)
+    repeated = await session.scalar(
+        select(Comment.id).where(
+            Comment.place_id == place.id, Comment.author_id == user.id, Comment.text == text
+        )
+    )
+    if repeated is not None:
+        return None
+    comment = await comments.post_comment(session, place, user, text, now)
+    return comment.id
+
+
+async def join(session: AsyncSession, user: User, place_id: int, note: str | None = None) -> Joined:
+    """Join the event; a participant of a swap may say what they bring, now or later (SPEC §3.4)."""
     now = utcnow()
     place = await _event_place(session, place_id, user)
     event = place.event
     seen = await place_queries.shown_status(session, place) if user.id == place.author_id else place.status
     if seen not in PUBLIC_STATUSES:
         raise ConflictError("Событие ещё не опубликовано.")
+    phase = mappers.phase_of(event, now)
+    if note is not None:
+        _check_note(place, note, phase)
+    joined_now = False
     if await _participation(session, place.id, user.id) is None:
         refusal = event_phase.join_refusal(
-            mappers.phase_of(event, now),
+            phase,
             registration_closed=event.registration_closed,
             capacity=event.capacity,
             participants_count=event.participants_count,
         )
         if refusal is not None:
-            raise ConflictError(refusal)
+            raise ConflictError(event_formats.join_refusal(place.category.slug, refusal))
         await add_participant(session, place, user, now)
+        joined_now = True
+    note_id = await _post_note(session, place, user, note, now) if note is not None else None
+    if joined_now or note_id is not None:
         await session.commit()
+    if joined_now:
         await interest_signals.on_participation(session, user.id, place.id, joined=True)
-    return await place_details.build(session, place, user, now)
+    return Joined(await place_details.build(session, place, user, now), note_id)
 
 
 async def leave(session: AsyncSession, user: User, place_id: int) -> PlaceDetail:
@@ -232,6 +273,42 @@ async def list_participants(
         .order_by(EventParticipant.created_at, EventParticipant.id)
     )
     return [UserBrief.model_validate(row.user) for row in rows]
+
+
+async def list_contributions(
+    session: AsyncSession, place_id: int, viewer: User | None = None
+) -> list[EventContribution]:
+    """What the current participants of a swap bring: their «Принесу: …» comments the viewer may
+    see (the viewer's own still being checked included), oldest first."""
+    place = await _event_place(session, place_id, viewer)
+    participants = select(EventParticipant.user_id).where(EventParticipant.place_id == place.id)
+    rows = list(
+        await session.scalars(
+            select(Comment)
+            .where(
+                Comment.place_id == place.id,
+                Comment.author_id.in_(participants),
+                comments.visible_clause(viewer),
+            )
+            .options(joinedload(Comment.author))
+            .order_by(Comment.created_at, Comment.id)
+        )
+    )
+    own = [row.id for row in rows if viewer is not None and row.author_id == viewer.id]
+    held = await quiet_holds.held_ids(session, AiTarget.COMMENT, own)
+    found: list[EventContribution] = []
+    for row in rows:
+        text = event_formats.brought(row.text)
+        if text is not None:
+            found.append(
+                EventContribution(
+                    comment_id=row.id,
+                    author=UserBrief.model_validate(row.author),
+                    text=text,
+                    on_review=row.id in held,
+                )
+            )
+    return found
 
 
 async def notify_participants(
@@ -282,10 +359,18 @@ async def apply_update(session: AsyncSession, place: Place, update: EventUpdate,
         event.registration_closed = update.registration_closed
         changed.append("регистрация")
 
+    slug = place.category.slug
     details_changed = False
     for name in _UPDATABLE_FIELDS:
-        if name in provided and getattr(event, name) != getattr(update, name):
-            setattr(event, name, getattr(update, name))
+        if name not in provided:
+            continue
+        value = getattr(update, name)
+        if name == "is_meetup":
+            value = event_formats.is_meetup(slug, value)
+        elif name == "price":
+            value = event_formats.price(slug, value)
+        if getattr(event, name) != value:
+            setattr(event, name, value)
             details_changed = True
     if details_changed:
         changed.append("параметры события")

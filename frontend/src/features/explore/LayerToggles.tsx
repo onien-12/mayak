@@ -1,18 +1,20 @@
 import type { Layer } from '@/shared/api';
 import { cn } from '@/shared/lib/cn';
-import { LAYER_META, LAYERS } from '@/shared/lib/labels';
+import { LAYER_META } from '@/shared/lib/labels';
 import { TONES } from '@/shared/lib/tones';
+
+import { MAP_LAYERS } from './filtersStore';
 
 interface LayerTogglesProps {
   active: readonly Layer[];
   onToggle: (layer: Layer) => void;
 }
 
-/** Four colour-coded switches — one per map layer. */
+/** Colour-coded switches, one per layer of the «Карта» section: infrastructure and sights. */
 export function LayerToggles({ active, onToggle }: LayerTogglesProps) {
   return (
-    <div role="group" aria-label="Слои карты" className="grid grid-cols-4 gap-1.5">
-      {LAYERS.map((layer) => {
+    <div role="group" aria-label="Слои карты" className="grid grid-cols-2 gap-1.5">
+      {MAP_LAYERS.map((layer) => {
         const meta = LAYER_META[layer];
         const selected = active.includes(layer);
         const Icon = meta.icon;

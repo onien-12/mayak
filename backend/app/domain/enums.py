@@ -220,6 +220,8 @@ class NotificationKind(StrEnum):
     LEVEL_UP = "level_up"
     ISSUE_UPDATE = "issue_update"
     TERRITORY = "territory"
+    LOST_FOUND = "lost_found"
+    """«Потеряшки» (SPEC §26): a response, its answer, or a post that may be the same thing."""
 
 
 class HistoryKind(StrEnum):
@@ -283,6 +285,9 @@ class AiTarget(StrEnum):
     COMMENT = "comment"
     REVIEW = "review"
     PHOTO = "photo"
+    LOST_ITEM = "lost_item"
+    """A lost-and-found post (SPEC §26); its photos are screened with it."""
+    LOST_RESPONSE = "lost_response"
 
 
 class HoldState(StrEnum):

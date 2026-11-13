@@ -105,7 +105,8 @@ async def _load_target(session: AsyncSession, reporter: User, payload: Complaint
     """Own content is refused first, so the author of a place in its screening window gets the same answer
     as for a published one."""
     if payload.target_type is TargetType.ROUTE:
-        return await routes.get_public_route(session, payload.target_id, reporter)
+        # A quest is a route underneath (SPEC §27): complained about by its id.
+        return await routes.get_public_route(session, payload.target_id, reporter, quest_ok=True)
     place = await place_queries.get_visible_place(session, payload.target_id, reporter)
     if place.author_id != reporter.id and place.status not in PUBLIC_STATUSES:
         raise ConflictError("На эту публикацию сейчас нельзя пожаловаться.")

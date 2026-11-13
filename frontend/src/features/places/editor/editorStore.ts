@@ -14,6 +14,8 @@ export interface PlaceEditorPreset {
   venuePlaceId?: number;
   venueTitle?: string;
   isMeetup?: boolean;
+  /** A format chosen up front («Раздача», «Нужна помощь», «Площадка»): the category step is skipped. */
+  categorySlug?: string;
   /** The location the place is added to («Добавить место сюда»); the author can change it. */
   areaId?: number;
   /** Where the point picker starts (unlike `point`, the picking step is not skipped). */
@@ -41,7 +43,8 @@ export const usePlaceEditor = create<PlaceEditorState>((set) => ({
 
 /**
  * Starts the "add a place" wizard from anywhere. Prefilled values skip the matching steps:
- * `layer` skips the layer choice, `point` (+ `address`) skips picking a point on the map.
+ * `layer` skips the layer choice, `categorySlug` the category, `point` (+ `address`) picking a
+ * point on the map.
  * Wrap the call in `requireAuth` — creating needs an account.
  */
 export function openCreatePlace(preset: PlaceEditorPreset = {}): void {

@@ -27,7 +27,19 @@ from app.domain.enums import (
     RouteStatus,
     StandingReason,
 )
-from app.models import Comment, MapNote, Photo, Place, QuietHold, Review, Route, RouteStop, User
+from app.models import (
+    Comment,
+    LostItem,
+    LostResponse,
+    MapNote,
+    Photo,
+    Place,
+    QuietHold,
+    Review,
+    Route,
+    RouteStop,
+    User,
+)
 from app.services import (
     areas,
     comments,
@@ -42,7 +54,9 @@ from app.services import (
     uploads,
 )
 from app.services.interests import tagging as interest_tagging
+from app.services.lost_found import responses as lost_responses
 from app.services.moderation_cases import CaseTarget
+from app.services.quests import lookup as quest_lookup
 
 _TITLE_LIMIT = 120
 _NOTE_TITLE = "Заметка на карте"
@@ -56,6 +70,8 @@ class Owner:
 
     title: str | None
     link: str | None
+    prefix: str | None = None
+    """How the notice names the item instead of the usual word («Квест» for a quest's route)."""
 
 
 def _title(prefix: str, title: str) -> str:
@@ -90,6 +106,11 @@ async def case_target(session: AsyncSession, hold: QuietHold) -> CaseTarget | No
             title = _title("Отзыв к", await _owner_title(session, item.place_id, item.route_id))
         case MapNote():
             title = _title("Заметка", item.object_name) if item.object_name else _NOTE_TITLE
+        case LostItem():
+            title = _title("Объявление", item.title)
+        case LostResponse():
+            post = await session.get(LostItem, item.item_id)
+            title = _title("Отклик к", post.title if post is not None else "")
         case _:
             stop = await session.get(RouteStop, item.route_stop_id) if item.route_stop_id else None
             title = _title(
@@ -102,7 +123,10 @@ async def _owner_of(session: AsyncSession, place_id: int | None, route_id: int |
     if place_id is not None:
         return Owner(await _owner_title(session, place_id, None), notifications.place_link(place_id))
     if route_id is not None:
-        return Owner(await _owner_title(session, None, route_id), notifications.route_link(route_id))
+        title = await _owner_title(session, None, route_id)
+        if await quest_lookup.is_quest(session, route_id):
+            return Owner(title, quest_lookup.quest_link(route_id), "Квест")
+        return Owner(title, notifications.route_link(route_id))
     return Owner(None, None)
 
 
@@ -118,6 +142,9 @@ async def owner(session: AsyncSession, hold: QuietHold) -> Owner | None:
         return None
     if isinstance(item, MapNote):
         return Owner(item.object_name, notifications.spot_link(item.lat, item.lng, item.object_id))
+    if isinstance(item, LostItem | LostResponse):
+        post = item if isinstance(item, LostItem) else await session.get(LostItem, item.item_id)
+        return Owner(post.title, lost_responses.item_link(post.id)) if post is not None else None
     route_id = item.route_id if isinstance(item, Review) else None
     if isinstance(item, Photo) and item.route_stop_id is not None:
         stop = await session.get(RouteStop, item.route_stop_id)
@@ -125,12 +152,16 @@ async def owner(session: AsyncSession, hold: QuietHold) -> Owner | None:
     return await _owner_of(session, item.place_id, route_id)
 
 
-async def _small_item(session: AsyncSession, hold: QuietHold) -> Comment | Review | MapNote | Photo | None:
+async def _small_item(
+    session: AsyncSession, hold: QuietHold
+) -> Comment | Review | MapNote | Photo | LostItem | LostResponse | None:
     model = {
         AiTarget.COMMENT: Comment,
         AiTarget.REVIEW: Review,
         AiTarget.NOTE: MapNote,
         AiTarget.PHOTO: Photo,
+        AiTarget.LOST_ITEM: LostItem,
+        AiTarget.LOST_RESPONSE: LostResponse,
     }[hold.target_type]
     return await session.get(model, hold.target_id)
 
@@ -195,7 +226,7 @@ async def _tell_author(session: AsyncSession, hold: QuietHold, now: datetime) ->
         session,
         user_id=hold.author_id,
         kind=NotificationKind.MODERATION,
-        title=hold_reasons.notice_title(hold.target_type, seen_by.title),
+        title=hold_reasons.notice_title(hold.target_type, seen_by.title, prefix=seen_by.prefix),
         body=hold_reasons.notice_body(hold.target_type, hold.reasons),
         link=seen_by.link,
         now=now,
@@ -323,6 +354,18 @@ async def _show(session: AsyncSession, hold: QuietHold, now: datetime) -> None:
             note = await session.get(MapNote, hold.target_id)
             if note is not None:
                 note.is_hidden = False
+        case AiTarget.LOST_ITEM | AiTarget.LOST_RESPONSE:
+            await _show_lost_found(session, hold, now)
+
+
+async def _show_lost_found(session: AsyncSession, hold: QuietHold, now: datetime) -> None:
+    """A post is shown unless a moderator took it down meanwhile; a response reaches the post's author."""
+    if hold.target_type is AiTarget.LOST_RESPONSE:
+        await lost_responses.show(session, hold.target_id, now)
+        return
+    post = await session.get(LostItem, hold.target_id)
+    if post is not None and not post.hidden_by_moderator:
+        post.is_hidden = False
 
 
 async def _show_place(session: AsyncSession, hold: QuietHold, now: datetime) -> None:

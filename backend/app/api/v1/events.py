@@ -1,17 +1,30 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Body, Depends, Query, Request
 
 from app.api.v1 import params
 from app.core.deps import CurrentUser, OptionalUser, SessionDep
+from app.core.rate_limit import limit_by_user
+from app.domain import limits
+from app.domain.enums import AiTarget
 from app.schemas.common import Latitude, Longitude, UtcDatetime
-from app.schemas.place import PlaceCard, PlaceDetail
+from app.schemas.feedback import EventContribution
+from app.schemas.place import EventJoinInput, PlaceCard, PlaceDetail
 from app.schemas.user import UserBrief
 from app.services import events
+from app.services.ai_moderation.screener import AiScreener, get_ai_screener
 from app.services.events import EventFilters, EventScope, EventSort, MeetupFilter
 from app.services.place_queries import Origin
 
 router = APIRouter(tags=["events"])
+
+_note_limit = limit_by_user(
+    "comments",
+    limit=limits.COMMENTS_PER_HOUR,
+    window=limits.HOUR,
+    message="Слишком много комментариев за час. Попробуйте позже.",
+)
+"""What a participant brings is a comment: it shares the comments' hourly limit."""
 
 
 def event_filters(
@@ -56,8 +69,21 @@ async def list_events(
 
 
 @router.put("/places/{place_id}/event/participation")
-async def join_event(place_id: int, user: CurrentUser, session: SessionDep) -> PlaceDetail:
-    return await events.join(session, user, place_id)
+async def join_event(
+    place_id: int,
+    user: CurrentUser,
+    session: SessionDep,
+    request: Request,
+    screener: Annotated[AiScreener, Depends(get_ai_screener)],
+    payload: Annotated[EventJoinInput | None, Body()] = None,
+) -> PlaceDetail:
+    note = payload.note if payload is not None else None
+    if note is not None:
+        await _note_limit(request, user)
+    joined = await events.join(session, user, place_id, note)
+    if joined.note_id is not None:
+        await screener.submit(AiTarget.COMMENT, joined.note_id)
+    return joined.detail
 
 
 @router.delete("/places/{place_id}/event/participation")
@@ -68,3 +94,10 @@ async def leave_event(place_id: int, user: CurrentUser, session: SessionDep) -> 
 @router.get("/places/{place_id}/event/participants")
 async def list_participants(place_id: int, viewer: OptionalUser, session: SessionDep) -> list[UserBrief]:
     return await events.list_participants(session, place_id, viewer)
+
+
+@router.get("/places/{place_id}/event/contributions")
+async def list_contributions(
+    place_id: int, viewer: OptionalUser, session: SessionDep
+) -> list[EventContribution]:
+    return await events.list_contributions(session, place_id, viewer)

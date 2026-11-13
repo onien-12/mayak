@@ -50,3 +50,12 @@ class CommentOut(_AuthoredText):
 
 class CommentIn(ApiModel):
     text: CommentText
+
+
+class EventContribution(_AuthoredText):
+    """What a participant of a swap brings: their «Принесу: …» comment without the prefix (SPEC §3.4)."""
+
+    comment_id: int
+    author: UserBrief
+    text: str
+    on_review: bool = False

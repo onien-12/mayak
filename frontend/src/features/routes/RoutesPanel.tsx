@@ -22,10 +22,13 @@ import {
 } from '@/shared/ui';
 
 import { CatalogMapLayer } from './catalog/CatalogMapLayer';
+import { CatalogSwitch } from './catalog/CatalogSwitch';
+import { useCatalogView } from './catalog/catalogView';
 import { DifficultyAndSort, KindChips, RouteSearchField } from './catalog/CatalogFilters';
 import { countCatalogFilters, useCatalogFilters, type CatalogScope } from './catalog/catalogStore';
 import { RouteListItem } from './catalog/RouteListItem';
 import { useRoutesCatalog } from './catalog/useRoutesCatalog';
+import { QuestsCatalog } from './quests/catalog/QuestsCatalog';
 
 function catalogTitle(count: number | undefined, mine: boolean): string {
   if (count === undefined) return 'Маршруты';
@@ -34,10 +37,10 @@ function catalogTitle(count: number | undefined, mine: boolean): string {
 }
 
 /**
- * «Маршруты»: public routes with kind / difficulty / search filters and sorting, the
- * user's own routes, start pins on the map and a line preview of the chosen card.
+ * Public routes with kind / difficulty / search filters and sorting, the user's own routes,
+ * start pins on the map and a line preview of the chosen card.
  */
-export default function RoutesPanel() {
+function RoutesCatalog() {
   const isDesktop = useIsDesktop();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
@@ -167,12 +170,15 @@ export default function RoutesPanel() {
           ),
         })}
         toolbar={
-          isDesktop && (
-            <div className="flex flex-col gap-3">
-              <RouteSearchField />
-              <KindChips />
-            </div>
-          )
+          <div className="flex flex-col gap-3">
+            <CatalogSwitch />
+            {isDesktop && (
+              <>
+                <RouteSearchField />
+                <KindChips />
+              </>
+            )}
+          </div>
         }
         footer={
           <Button block size="lg" icon={Plus} onClick={create}>
@@ -184,4 +190,10 @@ export default function RoutesPanel() {
       </PanelLayout>
     </>
   );
+}
+
+/** «Маршруты»: author routes, or quests (SPEC §27) behind the switch on top. */
+export default function RoutesPanel() {
+  const [view] = useCatalogView();
+  return view === 'quests' ? <QuestsCatalog /> : <RoutesCatalog />;
 }

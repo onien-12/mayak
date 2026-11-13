@@ -81,7 +81,9 @@ async def list_held(
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[HeldItemOut]:
     if kind is not None and kind not in moderation_held.SMALL_ITEMS:
-        raise FieldValidationError("kind", "Ожидается photo, comment, review или note.")
+        raise FieldValidationError(
+            "kind", "Ожидается photo, comment, review, note, lost_item или lost_response."
+        )
     return await moderation_held.list_held(session, kind=kind, limit=limit, offset=offset)
 
 

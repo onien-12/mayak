@@ -1,5 +1,5 @@
 {
-  "about": "Labelled text set of SPEC §24 measured on deepseek/deepseek-v4.1-flash on 2026-11-13 (16 of 16 with the hold rule violation | suspicious >= 0.6 | usefulness < 15). `answer` is a representative answer in the shape and band the model gave (junk usefulness 0-10, a bare «Туалет» about 25); the replay checks the app's rule and plumbing, not the model.",
+  "about": "Labelled text set of SPEC §24 measured on deepseek/deepseek-v4.1-flash on 2026-11-13 (16 of 16; 21 of 21 after the prompt learnt that an author's own contact for arranging a meetup, a request for help or a venue is not personal data; with the hold rule violation | suspicious >= 0.6 | usefulness < 15). `answer` is a representative answer in the shape and band the model gave (junk usefulness 0-10, a bare «Туалет» about 25); the replay checks the app's rule and plumbing, not the model.",
   "cases": [
     {
       "name": "подробный фонтанчик",
@@ -128,6 +128,51 @@
       "description": "Горячие пянсе с 8 утра, 150 рублей.",
       "expected": "show",
       "answer": {"verdict": "ok", "categories": [], "confidence": 0.9, "usefulness": 65, "summary": "Коротко и конкретно."}
+    },
+    {
+      "name": "площадка с телефоном владельца",
+      "slug": "venue",
+      "title": "Зал для тренировок на Светланской",
+      "description": "Светлый зал 60 м², зеркала, коврики, есть раздевалка.",
+      "attributes": {"activities": "тренировки, йога, лекции, мастер-классы", "capacity": 25, "free": false, "price": 800, "booking": "Пишите в телеграм @zal_svetlanskaya или звоните 8 914 123-45-67, Ольга", "hours": "ежедневно 9–21"},
+      "expected": "show",
+      "answer": {"verdict": "ok", "categories": [], "confidence": 0.9, "usefulness": 85, "summary": "Контакт владельца для брони — норма."}
+    },
+    {
+      "name": "бесплатная площадка с телефоном",
+      "slug": "venue",
+      "title": "Читальный зал библиотеки на Некрасовской",
+      "description": "Большой стол, проектор, можно собираться клубом по вечерам.",
+      "attributes": {"activities": "встречи клубов, лекции, настолки", "capacity": 30, "free": true, "booking": "Договориться с администратором на входе или по телефону 8 (423) 222-33-44"},
+      "expected": "show",
+      "answer": {"verdict": "ok", "categories": [], "confidence": 0.9, "usefulness": 75, "summary": "Полезная запись о площадке."}
+    },
+    {
+      "name": "просьба о помощи с контактом",
+      "slug": "help",
+      "title": "Перенести диван на третий этаж",
+      "description": "Нужны двое крепких людей в субботу днём, дом на Русской 41. Пишите мне в телеграм @dima_ch.",
+      "attributes": {"bring": "перчатки"},
+      "expected": "show",
+      "answer": {"verdict": "ok", "categories": [], "confidence": 0.95, "usefulness": 55, "summary": "Просьба соседа, контакт автора допустим."}
+    },
+    {
+      "name": "раздача",
+      "slug": "swap",
+      "title": "Раздаю детские вещи и книги",
+      "description": "Во дворе у фонтана, приходите с пакетами.",
+      "attributes": {"offer": "одежда на 3–5 лет, книги, настолки", "bring_own": true},
+      "expected": "show",
+      "answer": {"verdict": "ok", "categories": [], "confidence": 0.95, "usefulness": 45, "summary": "Соседская раздача."}
+    },
+    {
+      "name": "«площадка» — реклама посуточной аренды",
+      "slug": "venue",
+      "title": "Сдам квартиру посуточно",
+      "description": "Евроремонт, вид на море, 2500 в сутки. Звоните 8 999 111-22-33, скидки на неделю!",
+      "attributes": {"booking": "8 999 111-22-33"},
+      "expected": "hold",
+      "answer": {"verdict": "violation", "categories": ["ads", "off_topic"], "confidence": 0.95, "usefulness": 5, "summary": "Реклама посуточной аренды."}
     }
   ],
   "photos": {

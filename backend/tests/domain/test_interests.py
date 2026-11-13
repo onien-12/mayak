@@ -199,18 +199,127 @@ def test_one_result_per_title() -> None:
     assert rules.without_repeats(ranked, rules.title_key) == ["Артэтаж", "Видовая точка", "Маяк"]
 
 
-def test_every_third_result_is_a_discovery() -> None:
+def test_every_second_result_is_a_discovery() -> None:
     famous = [(Topic.HISTORY, f"famous {index}") for index in range(3)] + [
         (Topic.SEA, f"shore {index}") for index in range(3)
     ]
     niche = [(Topic.HISTORY, "niche a"), (Topic.SEA, "niche b"), (Topic.HISTORY, "niche c")]
     ranked = [*famous, *niche]
     taken = rules.arrange(ranked, lambda item: item[0], niche, limit=6)
-    # «niche a» is the third history result, so the cap sends the next places to the shore.
-    assert [name for _, name in taken] == ["famous 0", "famous 1", "niche a", "shore 0", "shore 1", "niche b"]
-    # With both topics full the rest follows by rank; nothing is dropped.
+    # The first discovery comes second; «famous 1» is the third history result, so the cap sends
+    # the next places to the shore and keeps «niche c» waiting.
+    assert [name for _, name in taken] == ["famous 0", "niche a", "famous 1", "niche b", "shore 0", "shore 1"]
+    # With both topics full the rest follows by rank, and discoveries keep their every second place.
     rest = rules.arrange(ranked, lambda item: item[0], niche, limit=9)[6:]
-    assert [name for _, name in rest] == ["famous 2", "shore 2", "niche c"]
+    assert [name for _, name in rest] == ["famous 2", "niche c", "shore 2"]
     assert rules.arrange(ranked, lambda item: item[0], [], limit=6) == rules.diversify(
         ranked, lambda item: item[0], limit=6
     )
+
+
+def test_one_interest_still_gets_its_discoveries() -> None:
+    famous = [(Topic.SPORT, f"famous {index}") for index in range(5)]
+    niche = [(Topic.SPORT, f"niche {index}") for index in range(3)]
+    taken = rules.arrange([*famous, *niche], lambda item: item[0], niche, limit=8)
+    assert [name for _, name in taken] == [
+        "famous 0",
+        "niche 0",
+        "famous 1",
+        "niche 1",
+        "famous 2",
+        "niche 2",
+        "famous 3",
+        "famous 4",
+    ]
+
+
+def test_at_most_two_locations_of_a_kind_lead() -> None:
+    parks = [(Topic.NATURE, f"park {index}", "park") for index in range(4)]
+    others = [
+        (Topic.SPORT, "embankment", "embankment"),
+        (Topic.SPORT, "court", None),
+        (Topic.HISTORY, "fort", None),
+    ]
+    ranked = [*parks, *others]
+    taken = rules.arrange(ranked, lambda item: item[0], [], limit=7, area_kind=lambda item: item[2])
+    # A full topic gives way before a full kind: the third and fourth parks come last.
+    assert [item[1] for item in taken] == [
+        "park 0",
+        "park 1",
+        "embankment",
+        "court",
+        "fort",
+        "park 2",
+        "park 3",
+    ]
+    nature_only = rules.arrange(parks, lambda item: item[0], [], limit=4, area_kind=lambda item: item[2])
+    assert nature_only == parks
+
+
+def test_residents_lead_at_comparable_match() -> None:
+    community, imported = rules.Provenance.COMMUNITY, rules.Provenance.IMPORTED
+    # At equal match a residents' object of the lowest quality beats an imported one of the highest.
+    assert rules.score(0.5, 0.0, community) > rules.score(0.5, 1.0, imported)
+    # An imported object overtakes it only with at least 1.2× the match …
+    assert rules.score(0.5, 0.0, community) > rules.score(0.59, 1.0, imported)
+    assert rules.score(0.5, 0.0, community) < rules.score(0.61, 1.0, imported)
+    # … about 1.5× at ordinary qualities.
+    assert rules.score(0.4, 0.5, community) > rules.score(0.55, 0.5, imported)
+    assert rules.score(0.5, 1.0) == rules.score(0.5, 1.0, community)
+
+
+def test_provenance_of_places_and_locations() -> None:
+    def place(
+        *,
+        community: bool = False,
+        described: bool = False,
+        pictured: bool = False,
+        usefulness: int | None = None,
+    ) -> rules.Provenance:
+        return rules.place_provenance(
+            community=community, described=described, pictured=pictured, usefulness=usefulness
+        )
+
+    assert place(community=True) is rules.Provenance.COMMUNITY
+    assert place() is rules.Provenance.BARE
+    assert place(described=True) is rules.Provenance.IMPORTED
+    assert place(pictured=True) is rules.Provenance.IMPORTED
+    assert place(usefulness=60) is rules.Provenance.IMPORTED
+    assert place(usefulness=30) is rules.Provenance.BARE
+    assert rules.area_provenance(0, 0) is rules.Provenance.BARE
+    assert rules.area_provenance(1, 0) is rules.Provenance.COMMUNITY
+    assert rules.area_provenance(0, 1) is rules.Provenance.COMMUNITY
+    # A bare object needs two of the person's topics, or one the model is sure of.
+    one_topic = rules.match({Topic.HISTORY: 0.6}, {Topic.HISTORY: 0.8})
+    assert one_topic >= rules.min_match(rules.Provenance.IMPORTED)
+    assert one_topic < rules.min_match(rules.Provenance.BARE)
+    assert rules.match({Topic.HISTORY: 0.6}, {Topic.HISTORY: 1.0}) < rules.min_match(rules.Provenance.BARE)
+    two_topics = rules.match({Topic.HISTORY: 0.6, Topic.SEA: 0.6}, {Topic.HISTORY: 0.8, Topic.SEA: 0.6})
+    assert two_topics >= rules.min_match(rules.Provenance.BARE)
+
+
+def test_discoveries_and_events_inside_locations() -> None:
+    assert rules.is_discovery(0)
+    assert rules.is_discovery(2)
+    assert not rules.is_discovery(3)
+    community, imported = rules.Provenance.COMMUNITY, rules.Provenance.IMPORTED
+    assert sorted(
+        [(imported, 0.6), (community, 0.3), (community, 0.5)],
+        key=lambda item: rules.discovery_rank(*item),
+    ) == [(community, 0.5), (community, 0.3), (imported, 0.6)]
+    assert rules.event_leads(rules.MIN_MATCH)
+    assert not rules.event_leads(0.1)
+
+
+def test_an_imported_discovery_never_takes_the_place_of_a_residents_result() -> None:
+    pier, yard, museum = (Topic.SEA, "pier", True), (Topic.SEA, "yard", True), (Topic.SEA, "museum", False)
+    cape = (Topic.SEA, "cape", False)
+    taken = rules.arrange(
+        [pier, yard, museum, cape], lambda item: item[0], [cape], limit=4, by_residents=lambda item: item[2]
+    )
+    assert [item[1] for item in taken] == ["pier", "yard", "museum", "cape"]
+    ours = (Topic.SEA, "cape", True)
+    taken = rules.arrange(
+        [pier, yard, museum, ours], lambda item: item[0], [ours], limit=4, by_residents=lambda item: item[2]
+    )
+    assert [item[1] for item in taken] == ["pier", "cape", "yard", "museum"]

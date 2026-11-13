@@ -37,6 +37,18 @@ function areasApplicable(filters: ExploreFilters): boolean {
 }
 
 /**
+ * Locations with an upcoming event residents made inside lead, the soonest first; the rest keep
+ * the server's order (most interesting first).
+ */
+function withResidentsEventsFirst(areas: readonly AreaCard[]): AreaCard[] {
+  const nextStart = (area: AreaCard) => area.next_community_event?.starts_at ?? '';
+  const withEvents = areas
+    .filter((area) => area.next_community_event)
+    .sort((a, b) => nextStart(a).localeCompare(nextStart(b)));
+  return [...withEvents, ...areas.filter((area) => !area.next_community_event)];
+}
+
+/**
  * Areas of the explore section: by viewport (or by the search text), the fold predicate for
  * the place layer and the list of places that are not represented by an area right now.
  */
@@ -61,7 +73,15 @@ export function useExploreAreas(nearby: readonly NearbyPlace[], activeSearch: st
     placeholderData: keepPreviousData,
   });
 
-  const areas = applicable ? query.data : undefined;
+  // Small OpenStreetMap territories nobody has made anything in stay out unless asked for: by a
+  // search or by «Всё из OpenStreetMap», like bare background places (SPEC §18). Neither listed
+  // nor drawn; a direct link still opens the card.
+  const showBare = filters.includeUnnamed || activeSearch !== '';
+  const fetched = applicable ? query.data : undefined;
+  const areas = useMemo(
+    () => (showBare ? fetched : fetched?.filter((area) => !area.bare_background)),
+    [fetched, showBare],
+  );
   const idsKey = areas?.map((area) => area.id).join(',') ?? '';
   const ids = useMemo(() => new Set(idsKey.split(',').filter(Boolean).map(Number)), [idsKey]);
   const fold = useCallback(
@@ -71,11 +91,11 @@ export function useExploreAreas(nearby: readonly NearbyPlace[], activeSearch: st
   );
 
   const bounds = viewport?.bounds;
-  const visibleAreas = useMemo(
-    () =>
-      !areas ? [] : activeSearch || !bounds ? areas : areas.filter((a) => boundsContain(bounds, a)),
-    [areas, bounds, activeSearch],
-  );
+  const visibleAreas = useMemo(() => {
+    if (!areas) return [];
+    const shown = activeSearch || !bounds ? areas : areas.filter((a) => boundsContain(bounds, a));
+    return withResidentsEventsFirst(shown);
+  }, [areas, bounds, activeSearch]);
   const listedPlaces = useMemo(
     () => (areas && folded && !activeSearch ? nearby.filter(({ place }) => !fold(place)) : nearby),
     [areas, folded, activeSearch, nearby, fold],
@@ -84,7 +104,7 @@ export function useExploreAreas(nearby: readonly NearbyPlace[], activeSearch: st
   return {
     /** All fetched areas — pass to `useMapAreas` (empty while filters make areas meaningless). */
     areas: areas ?? NO_AREAS,
-    /** Areas whose label point is in view (or all search hits), most interesting first. */
+    /** Areas whose label point is in view (or all search hits): with residents' events first. */
     visibleAreas,
     /** Places not folded into an area right now — the list under the areas. */
     listedPlaces,

@@ -17,7 +17,7 @@ from app.core.errors import (
     ForbiddenError,
     RateLimitedError,
 )
-from app.domain import ai_moderation, content_check, geo, levels, limits, trust
+from app.domain import ai_moderation, content_check, event_formats, geo, levels, limits, trust
 from app.domain import attributes as attribute_rules
 from app.domain.attributes import AttributeValue
 from app.domain.enums import (
@@ -294,17 +294,18 @@ def expand_occurrences(payload: PlaceInput) -> list[PlaceInput]:
     ]
 
 
-def _event_details(event: EventInput, series_id: str | None) -> EventDetails:
+def _event_details(event: EventInput, slug: str, series_id: str | None) -> EventDetails:
+    """A resident format may fix some of the fields: a request for help is always a meetup."""
     return EventDetails(
         starts_at=event.starts_at,
         ends_at=event.ends_at,
         capacity=event.capacity,
-        price=event.price,
+        price=event_formats.price(slug, event.price),
         price_note=event.price_note or None,
         age_limit=event.age_limit,
         registration_url=event.registration_url or None,
         contact=event.contact or None,
-        is_meetup=event.is_meetup,
+        is_meetup=event_formats.is_meetup(slug, event.is_meetup),
         venue_place_id=event.venue_place_id,
         series_id=series_id,
     )
@@ -384,7 +385,7 @@ def build_place(
         cover_url=external.image_url if external else None,
         created_at=now,
         updated_at=now,
-        event=_event_details(payload.event, series_id) if payload.event else None,
+        event=_event_details(payload.event, category.slug, series_id) if payload.event else None,
         issue=_issue_details(payload.issue, now) if payload.layer is Layer.ISSUE else None,
     )
 

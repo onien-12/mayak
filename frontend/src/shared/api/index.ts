@@ -1,4 +1,6 @@
 export * from './types';
+export * from './questTypes';
+export * from './lostTypes';
 export { api, ApiError, configureApiAuth, errorMessage } from './client';
 export { queryKeys } from './queryKeys';
 export { queryClient } from './queryClient';
@@ -12,9 +14,11 @@ export { eventsApi } from './events';
 export { interestsApi } from './interests';
 export { uploadsApi, UPLOAD_ACCEPT, UPLOAD_MAX_BYTES } from './uploads';
 export { routesApi } from './routes';
+export { questsApi } from './quests';
 export { complaintsApi } from './complaints';
 export { collectionsApi } from './collections';
 export { notesApi } from './notes';
+export { lostApi } from './lost';
 export { notificationsApi } from './notifications';
 export { outagesApi } from './outages';
 export { moderationApi } from './moderation';

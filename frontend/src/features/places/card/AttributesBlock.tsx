@@ -19,8 +19,16 @@ function formatValue(field: FieldDef, value: AttributeValue): string {
  * Objective facts about the place rendered from the category `fields` — visually separate
  * from reviews, which are subjective.
  */
-export function AttributesBlock({ place }: { place: PlaceDetail }) {
+export function AttributesBlock({
+  place,
+  omit = [],
+}: {
+  place: PlaceDetail;
+  /** Facts the card already shows in a block of their own (a giveaway's offer, a venue's terms). */
+  omit?: readonly string[];
+}) {
   const rows = place.category.fields.flatMap((field) => {
+    if (omit.includes(field.key)) return [];
     const value = place.attributes[field.key];
     if (value === undefined || value === '') return [];
     return isRelevantFact(field.key, place.attributes) ? [{ field, value }] : [];

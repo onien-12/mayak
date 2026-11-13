@@ -3,9 +3,10 @@ import {
   ChartColumn,
   Heart,
   Map as MapIcon,
+  PackageSearch,
   Route,
   ShieldCheck,
-  ZapOff,
+  TriangleAlert,
   type LucideIcon,
 } from 'lucide-react';
 import { useLocation } from 'react-router';
@@ -18,18 +19,37 @@ export interface NavItem {
   match: readonly string[];
 }
 
-export const PRIMARY_NAV: readonly NavItem[] = [
+/** Lost and found things (SPEC §26). */
+export const LOST_NAV: NavItem = {
+  to: '/lost',
+  label: 'Потеряшки',
+  icon: PackageSearch,
+  match: ['/lost'],
+};
+export const SAVED_NAV: NavItem = {
+  to: '/saved',
+  label: 'Избранное',
+  icon: Heart,
+  match: ['/saved', '/collections'],
+};
+
+/** Phone tab bar: four sections, the fifth slot is «Ещё» (the menu of the rest and the account). */
+export const TAB_BAR_NAV: readonly NavItem[] = [
   { to: '/', label: 'Карта', icon: MapIcon, match: [] },
   { to: '/events', label: 'События', icon: CalendarDays, match: ['/events'] },
-  { to: '/routes', label: 'Маршруты', icon: Route, match: ['/routes'] },
-  { to: '/saved', label: 'Избранное', icon: Heart, match: ['/saved', '/collections'] },
+  { to: '/routes', label: 'Маршруты', icon: Route, match: ['/routes', '/quests'] },
+  LOST_NAV,
 ];
 
-export const OUTAGES_NAV: NavItem = {
-  to: '/outages',
-  label: 'Отключения',
-  icon: ZapOff,
-  match: ['/outages'],
+/** Desktop rail, upper group. */
+export const PRIMARY_NAV: readonly NavItem[] = [...TAB_BAR_NAV, SAVED_NAV];
+
+/** Utility outages and residents' problems; `/outages` is the old address of outages. */
+export const PROBLEMS_NAV: NavItem = {
+  to: '/problems',
+  label: 'Проблемы',
+  icon: TriangleAlert,
+  match: ['/problems', '/outages'],
 };
 export const STATS_NAV: NavItem = {
   to: '/stats',

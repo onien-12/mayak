@@ -49,6 +49,7 @@ import {
   MessageCircleQuestion,
   Mountain,
   Newspaper,
+  PackageSearch,
   Pencil,
   Radio,
   RotateCcw,
@@ -887,6 +888,7 @@ export const NOTIFICATION_KIND_META: Record<NotificationKind, Meta> = {
   level_up: { label: 'Новый уровень', tone: 'beam', icon: TrendingUp },
   issue_update: { label: 'Проблема: обновление', tone: 'issue', icon: TriangleAlert },
   territory: { label: 'Рядом с вами', tone: 'infrastructure', icon: MapPinned },
+  lost_found: { label: 'Потеряшки', tone: 'beam', icon: PackageSearch },
 };
 
 export const NOTIFICATION_FALLBACK_META: Meta = {

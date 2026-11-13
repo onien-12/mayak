@@ -30,7 +30,6 @@ function buildQuery(filters: EventsFilters, search: string, origin: LatLng | nul
     ),
     categories: filters.categoryIds.length > 0 ? filters.categoryIds : undefined,
     q: search || undefined,
-    meetups: filters.kind === 'meetups' ? 'only' : filters.kind === 'city' ? 'exclude' : undefined,
     origin: filters.origin === 'all' ? undefined : filters.origin,
     free: filters.free || undefined,
     sort:

@@ -1,7 +1,7 @@
 import { Layers, MapPinOff, SearchX } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 
-import { AreaListItem } from '@/features/areas';
+import { AreaListItem, CommunityEventLine } from '@/features/areas';
 import { ForYouInvite } from '@/features/interests';
 import { PlaceListItem } from '@/features/places';
 import { Button, EmptyState, ErrorState, ListSkeleton, StaggerItem } from '@/shared/ui';
@@ -27,8 +27,9 @@ interface PlaceResultsProps {
 
 /**
  * The list under the map, one for everything: what is recommended to the viewer first,
- * then areas (richer cards, most interesting on top), then the places that are not folded
- * into them; loading, empty and error states.
+ * then areas (richer cards: those with residents' upcoming events on top, then the most
+ * interesting), then the places that are not folded into them (residents' first, nearest
+ * first within); loading, empty and error states.
  */
 export function PlaceResults({ results, areas, hasFilters, forYou, addresses }: PlaceResultsProps) {
   const reset = useExploreFilters((state) => state.reset);
@@ -87,9 +88,17 @@ export function PlaceResults({ results, areas, hasFilters, forYou, addresses }: 
             {leading.map((item, index) => (
               <StaggerItem key={`${item.type}:${item.area?.id ?? item.place?.id}`} index={index}>
                 {item.area ? (
-                  <AreaListItem area={item.area} />
+                  <AreaListItem area={item.area} event={item.reason_event} />
                 ) : (
-                  item.place && <PlaceListItem place={item.place} forYou />
+                  item.place && (
+                    <div className="flex flex-col gap-1.5">
+                      <PlaceListItem place={item.place} forYou />
+                      {/* A venue raised for a residents' event there: name the event. */}
+                      {item.reason_event && (
+                        <CommunityEventLine event={item.reason_event} className="px-3" />
+                      )}
+                    </div>
+                  )
                 )}
               </StaggerItem>
             ))}

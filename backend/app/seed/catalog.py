@@ -78,6 +78,17 @@ SPORT_FIELDS = [FREE, LIGHTING, SURFACE, HOURS]
 MEDICAL_FIELDS = [HOURS, ACCESS, INFO_SOURCE, ACCESSIBLE]
 ACCESSIBILITY_FIELDS = [CONDITION, HOURS, _text("note", "Особенности")]
 EVENT_FIELDS = [ORGANIZER, ACCESSIBLE]
+SWAP_FIELDS = [_text("offer", "Что отдают"), _boolean("bring_own", "Можно принести своё")]
+HELP_FIELDS = [_text("bring", "Что взять с собой")]
+VENUE_FIELDS = [
+    _text("activities", "Что можно провести"),
+    _number("capacity", "Вмещает", "чел."),
+    FREE,
+    _number("price", "Стоимость", "₽ в час"),
+    _text("booking", "Как договориться"),
+    HOURS,
+    ACCESSIBLE,
+]
 SIGHT_FIELDS = [FREE, ENTRY_FEE, HOURS, ACCESSIBLE]
 OUTDOOR_FIELDS = [DIFFICULTY, PARKING, FREE, ACCESSIBLE]
 ISSUE_FIELDS = [_text("cause", "Причина")]
@@ -179,6 +190,7 @@ CATEGORIES: tuple[Row, ...] = (
     ),
     ("wifi", Layer.INFRASTRUCTURE, PUBLIC, "Wi-Fi", "wifi", [FREE, _text("network", "Название сети"), HOURS]),
     ("library", Layer.INFRASTRUCTURE, PUBLIC, "Библиотека", "library", [FREE, HOURS, ACCESSIBLE]),
+    ("venue", Layer.INFRASTRUCTURE, PUBLIC, "Площадка для встреч", "presentation", VENUE_FIELDS),
     (
         "sports_ground",
         Layer.INFRASTRUCTURE,
@@ -205,6 +217,8 @@ CATEGORIES: tuple[Row, ...] = (
     ("sport", Layer.EVENT, EVENTS, "Спорт", "trophy", EVENT_FIELDS),
     ("education", Layer.EVENT, EVENTS, "Образование", "graduation-cap", EVENT_FIELDS),
     ("entertainment", Layer.EVENT, EVENTS, "Развлечения", "party-popper", EVENT_FIELDS),
+    ("swap", Layer.EVENT, EVENTS, "Раздача и барахолка", "gift", SWAP_FIELDS),
+    ("help", Layer.EVENT, EVENTS, "Нужна помощь", "hand-helping", HELP_FIELDS),
     ("historic", Layer.TOURISM, TOURISM, "История", "landmark", SIGHT_FIELDS),
     ("architecture", Layer.TOURISM, TOURISM, "Архитектура", "building", SIGHT_FIELDS),
     (

@@ -1,4 +1,5 @@
-"""Held photos, comments, reviews and notes (SPEC §24.1): a list apart from the case queue.
+"""Held photos, comments, reviews, notes and lost-and-found posts and responses (SPEC §24.1, §26):
+a list apart from the case queue.
 
 Each held item has a moderation case of its own (opened by the hold), so every decision goes
 to the same immutable log. Two outcomes only: release (show it after all) or remove; either way
@@ -16,6 +17,8 @@ from app.core.errors import ConflictError, NotFoundError
 from app.domain.enums import AiTarget, CaseState, HoldState, ModerationAction, NotificationKind
 from app.models import (
     Comment,
+    LostItem,
+    LostResponse,
     MapNote,
     ModerationCase,
     Photo,
@@ -31,27 +34,40 @@ from app.schemas.place import PhotoOut
 from app.schemas.user import UserBrief
 from app.services import moderation, moderation_cases, notifications, screening, standing
 
-SMALL_ITEMS = (AiTarget.PHOTO, AiTarget.COMMENT, AiTarget.REVIEW, AiTarget.NOTE)
+SMALL_ITEMS = (
+    AiTarget.PHOTO,
+    AiTarget.COMMENT,
+    AiTarget.REVIEW,
+    AiTarget.NOTE,
+    AiTarget.LOST_ITEM,
+    AiTarget.LOST_RESPONSE,
+)
 DEFAULT_LIMIT = 50
 MAX_LIMIT = 200
 
-_MODELS: dict[AiTarget, type[Comment | Review | MapNote | Photo]] = {
+_MODELS: dict[AiTarget, type[Comment | Review | MapNote | Photo | LostItem | LostResponse]] = {
     AiTarget.PHOTO: Photo,
     AiTarget.COMMENT: Comment,
     AiTarget.REVIEW: Review,
     AiTarget.NOTE: MapNote,
+    AiTarget.LOST_ITEM: LostItem,
+    AiTarget.LOST_RESPONSE: LostResponse,
 }
 _RELEASED_TITLES: dict[AiTarget, str] = {
     AiTarget.PHOTO: "Ваше фото проверено и опубликовано",
     AiTarget.COMMENT: "Ваш комментарий проверен и опубликован",
     AiTarget.REVIEW: "Ваш отзыв проверен и опубликован",
     AiTarget.NOTE: "Ваша заметка проверена и опубликована",
+    AiTarget.LOST_ITEM: "Ваше объявление проверено и опубликовано",
+    AiTarget.LOST_RESPONSE: "Ваш отклик проверен и отправлен автору объявления",
 }
 _REMOVED_TITLES: dict[AiTarget, str] = {
     AiTarget.PHOTO: "Ваше фото убрано модератором",
     AiTarget.COMMENT: "Ваш комментарий удалён модератором",
     AiTarget.REVIEW: "Ваш отзыв удалён модератором",
     AiTarget.NOTE: "Ваша заметка удалена модератором",
+    AiTarget.LOST_ITEM: "Ваше объявление убрано модератором",
+    AiTarget.LOST_RESPONSE: "Ваш отклик удалён модератором",
 }
 
 
@@ -82,9 +98,21 @@ async def _item_fields(session: AsyncSession, hold: QuietHold) -> dict[str, obje
             }
         case MapNote():
             return {"text": item.text, "object_name": item.object_name, "place": None, "route": None}
+        case LostItem() | LostResponse():
+            return await _lost_found_fields(session, item)
     stop = await session.get(RouteStop, item.route_stop_id) if item.route_stop_id else None
     owners = await _owners(session, item.place_id, stop.route_id if stop else None)
     return {"photo": PhotoOut.model_validate(item), **owners}
+
+
+async def _lost_found_fields(session: AsyncSession, item: LostItem | LostResponse) -> dict[str, object]:
+    """A response names its post where a note names its object (SPEC §26)."""
+    if isinstance(item, LostItem):
+        text, title = f"{item.title}\n{item.description}".strip(), None
+    else:
+        post = await session.get(LostItem, item.item_id)
+        text, title = item.message, post.title if post is not None else None
+    return {"text": text, "object_name": title, "place": None, "route": None}
 
 
 async def list_held(

@@ -10,11 +10,13 @@ from app.api.v1 import (
     complaints,
     events,
     interests,
+    lost_found,
     moderation,
     notes,
     notifications,
     outages,
     places,
+    quests,
     routes,
     stats,
     uploads,
@@ -46,6 +48,7 @@ for module in (
     events,
     uploads,
     routes,
+    quests,
     notes,
     outages,
     complaints,
@@ -54,6 +57,7 @@ for module in (
     moderation,
     stats,
     interests,
+    lost_found,
 ):
     api_router.include_router(module.router)
 # External reviews (SPEC §20); cards read their cached ratings through `combined_ratings` (§22).

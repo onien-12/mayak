@@ -42,6 +42,7 @@ from app.schemas.user import (
     UserUpdate,
 )
 from app.services import locality, notifications, place_queries, places, quiet_holds, reputation
+from app.services.quests import lookup as quest_lookup
 
 DEFAULT_TOP_LIMIT = 10
 MAX_TOP_LIMIT = 50
@@ -198,7 +199,9 @@ async def _stats(session: AsyncSession, user_id: int, viewer: User | None) -> Us
         ),
         votes=await _count(session, Vote, Vote.user_id == user_id),
         reviews=await _count(session, Review, Review.author_id == user_id, reviews_shown),
-        routes=await _count(session, Route, Route.author_id == user_id, public_route),
+        routes=await _count(
+            session, Route, Route.author_id == user_id, public_route, ~quest_lookup.is_quest_clause()
+        ),
         events_organized=await _count(
             session, Place, Place.author_id == user_id, Place.layer == Layer.EVENT, is_public
         ),

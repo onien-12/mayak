@@ -339,15 +339,61 @@ async def test_areas_are_recommended_with_their_personal_interest(world: World, 
             "/areas", json={"title": "Пляж Шамора", "kind": "beach", **spot(0), "radius_m": 300}
         )
     ).json()
+    # Nothing residents made inside yet: a bare location needs a clearly stronger match than one topic.
+    assert (await recommendations(client, topics="sea"))["items"] == []
+    await world.create_place(trusted, **spot(0))
     result = await recommendations(client, topics="sea")
     assert ids(result) == [("area", area["id"])]
     card = result["items"][0]["area"]
-    assert card["personal_interest"] == {"value": 24, "topics": ["sea"]}
+    assert card["personal_interest"] == {
+        "value": rules.personal_interest(card["interest"], 0.48),
+        "topics": ["sea"],
+    }
     assert result["items"][0]["topics"] == ["sea"]
     assert result["items"][0]["place"] is None
+    assert result["items"][0]["reason_event"] is None
     # The author of a location does not get it recommended.
     await trusted.put("/me/interests", json={"topics": ["sea"]})
     assert (await recommendations(trusted))["items"] == []
+
+
+async def test_a_residents_event_raises_its_location_and_its_venue(world: World, client: AsyncClient) -> None:
+    trusted = await world.actor("trusted", reputation=TRUSTED)
+    organizer = await world.actor("organizer", reputation=TRUSTED)
+    square = (
+        await trusted.post(
+            "/areas", json={"title": "Сквер Тобольский", "kind": "square", **spot(0), "radius_m": 150}
+        )
+    ).json()
+    assert (await recommendations(client, topics="sport"))["items"] == []
+
+    run = await world.create_place(
+        organizer, "sport", title="Забег с собаками", event=world.event_window(24), **spot(0)
+    )
+    result = await recommendations(client, topics="sport")
+    assert ids(result) == [("area", square["id"])]
+    item = result["items"][0]
+    assert item["topics"] == ["sport"]
+    assert (item["reason_event"]["id"], item["reason_event"]["title"]) == (run["id"], "Забег с собаками")
+    assert item["area"]["community_events_upcoming"] == 1
+    assert item["area"]["next_community_event"]["id"] == run["id"]
+    # The same event is no reason for a person who does not care for sport.
+    assert (await recommendations(client, topics="history"))["items"] == []
+
+    # A sight that is the venue of a residents' lecture is raised for those who like lectures.
+    yard = await world.create_place(trusted, "unusual", title="Двор с аркой", **spot(4))
+    lecture = await world.create_place(
+        organizer,
+        "education",
+        title="Лекция о старых дворах",
+        event={**world.event_window(48), "venue_place_id": yard["id"]},
+        **spot(4, 30),
+    )
+    raised = await recommendations(client, topics="learning")
+    assert ("place", yard["id"]) in ids(raised)
+    venue = next(entry for entry in raised["items"] if entry["place"] and entry["place"]["id"] == yard["id"])
+    assert venue["reason_event"]["id"] == lecture["id"]
+    assert venue["topics"] == ["learning"]
 
 
 async def test_events_scope(world: World, client: AsyncClient) -> None:
@@ -438,7 +484,9 @@ async def test_lists_keep_a_fixed_number_of_queries(world: World, app: Any, clie
         assert response.status_code == 200
         return len(statements)
 
+    # Every beach gets a residents' place inside: an empty one would not be recommended at all.
     await trusted.post("/areas", json={"title": "Пляж 0", "kind": "beach", **spot(0, 2000), "radius_m": 60})
+    await world.create_place(trusted, **spot(0, 2000))
     await world.create_place(trusted, "historic", **spot(0))
     engine = app.state.database.engine.sync_engine
     event.listen(engine, "before_cursor_execute", record)
@@ -450,6 +498,7 @@ async def test_lists_keep_a_fixed_number_of_queries(world: World, app: Any, clie
                 "/areas",
                 json={"title": f"Пляж {index}", "kind": "beach", **spot(index, 2000), "radius_m": 60},
             )
+            await world.create_place(trusted, **spot(index, 2000))
             await world.create_place(trusted, "historic", **spot(index))
         areas_many = await count("/areas", {"topics": "sea"})
         recs_many = await count("/recommendations", {"topics": "sea,history"})

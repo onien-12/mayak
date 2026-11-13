@@ -14,6 +14,8 @@ import type {
   RoutePreviewInput,
   RoutesQuery,
 } from './types';
+import type { QuestsQuery } from './questTypes';
+import type { LostQuery, LostSearchQuery } from './lostTypes';
 import type { GeocodeLevel } from './twogis';
 
 /**
@@ -38,6 +40,7 @@ export const queryKeys = {
     reviews: (id: number) => ['places', 'detail', id, 'reviews'] as const,
     comments: (id: number) => ['places', 'detail', id, 'comments'] as const,
     participants: (id: number) => ['places', 'detail', id, 'participants'] as const,
+    contributions: (id: number) => ['places', 'detail', id, 'contributions'] as const,
   },
   areas: {
     all: ['areas'] as const,
@@ -65,6 +68,17 @@ export const queryKeys = {
     reviews: (id: number) => ['routes', 'detail', id, 'reviews'] as const,
     preview: (input: RoutePreviewInput) =>
       ['routes', 'preview', input.kind, input.path_mode ?? 'roads', input.points] as const,
+  },
+  quests: {
+    all: ['quests'] as const,
+    lists: ['quests', 'list'] as const,
+    list: (query: QuestsQuery) => ['quests', 'list', query] as const,
+    mine: ['quests', 'mine'] as const,
+    detail: (id: number) => ['quests', 'detail', id] as const,
+    editor: (id: number) => ['quests', 'detail', id, 'editor'] as const,
+    results: (id: number) => ['quests', 'detail', id, 'results'] as const,
+    reviews: (id: number) => ['quests', 'detail', id, 'reviews'] as const,
+    run: (runId: number) => ['quests', 'run', runId] as const,
   },
   collections: {
     all: ['collections'] as const,
@@ -103,6 +117,15 @@ export const queryKeys = {
   notes: {
     all: ['notes'] as const,
     list: (query: NotesQuery) => ['notes', 'list', query] as const,
+  },
+  lost: {
+    all: ['lost'] as const,
+    list: (query: LostQuery) => ['lost', 'list', query] as const,
+    mine: ['lost', 'mine'] as const,
+    search: (query: LostSearchQuery) => ['lost', 'search', query] as const,
+    detail: (id: number) => ['lost', 'detail', id] as const,
+    matches: (id: number) => ['lost', 'detail', id, 'matches'] as const,
+    responses: (id: number) => ['lost', 'detail', id, 'responses'] as const,
   },
   notifications: {
     all: ['notifications'] as const,

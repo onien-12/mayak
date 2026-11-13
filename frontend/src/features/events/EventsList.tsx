@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { Fragment, useMemo, type ReactNode } from 'react';
 
 import type { PlaceCard } from '@/shared/api';
 import { haversine, type LatLng } from '@/shared/lib/geo';
@@ -40,7 +40,12 @@ interface EventsListProps {
   /** A radius is set: cards show the distance instead of the address. */
   distanceOnly: boolean;
   highlightId: number | null;
+  /** Shown after the first day (grouped) or the first few cards (flat). */
+  afterFirstGroup?: ReactNode;
 }
+
+/** A flat list has no days: the slot goes after this many cards. */
+const FLAT_SLOT_AFTER = 3;
 
 /** The afisha list: day groups with sticky headers («Сегодня», «Завтра, 12 ноября»…). */
 export function EventsList({
@@ -49,6 +54,7 @@ export function EventsList({
   distanceOrigin,
   distanceOnly,
   highlightId,
+  afterFirstGroup,
 }: EventsListProps) {
   const groups = useMemo(() => (grouped ? groupByDay(events) : null), [events, grouped]);
   const card = (place: PlaceCard, index: number, withDate: boolean) => (
@@ -63,26 +69,46 @@ export function EventsList({
     </StaggerItem>
   );
 
-  if (!groups) {
+  if (!groups && !afterFirstGroup) {
     return (
       <ul aria-label="События" className="flex flex-col gap-2">
         {events.map((place, index) => card(place, index, true))}
       </ul>
     );
   }
+  if (!groups) {
+    return (
+      <>
+        <ul aria-label="События" className="flex flex-col gap-2">
+          {events.slice(0, FLAT_SLOT_AFTER).map((place, index) => card(place, index, true))}
+        </ul>
+        {afterFirstGroup}
+        {events.length > FLAT_SLOT_AFTER && (
+          <ul aria-label="События, продолжение" className="flex flex-col gap-2">
+            {events
+              .slice(FLAT_SLOT_AFTER)
+              .map((place, index) => card(place, FLAT_SLOT_AFTER + index, true))}
+          </ul>
+        )}
+      </>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-1">
-      {groups.map((group) => (
-        <section key={group.key} aria-label={dayHeading(group.key)}>
-          <h2 className="sticky top-0 z-10 -mx-4 flex items-baseline justify-between bg-surface/90 px-4 py-2.5 backdrop-blur-md lg:-mx-5 lg:px-5 lite:bg-surface">
-            <span className="text-sm font-semibold text-ink">{dayHeading(group.key)}</span>
-            <span className="text-xs text-ink-faint tabular-nums">{group.events.length}</span>
-          </h2>
-          <ul className="flex flex-col gap-2 pb-2">
-            {group.events.map((place, index) => card(place, group.offset + index, false))}
-          </ul>
-        </section>
+      {groups.map((group, groupIndex) => (
+        <Fragment key={group.key}>
+          <section aria-label={dayHeading(group.key)}>
+            <h2 className="sticky top-0 z-10 -mx-4 flex items-baseline justify-between bg-surface/90 px-4 py-2.5 backdrop-blur-md lg:-mx-5 lg:px-5 lite:bg-surface">
+              <span className="text-sm font-semibold text-ink">{dayHeading(group.key)}</span>
+              <span className="text-xs text-ink-faint tabular-nums">{group.events.length}</span>
+            </h2>
+            <ul className="flex flex-col gap-2 pb-2">
+              {group.events.map((place, index) => card(place, group.offset + index, false))}
+            </ul>
+          </section>
+          {groupIndex === 0 && afterFirstGroup && <div className="pb-2">{afterFirstGroup}</div>}
+        </Fragment>
       ))}
     </div>
   );

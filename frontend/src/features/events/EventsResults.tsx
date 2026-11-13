@@ -9,6 +9,7 @@ import { ForYouEvents } from './ForYouEvents';
 import { MyEvents } from './MyEvents';
 import { OngoingStrip } from './OngoingStrip';
 import type { EventsFeed } from './useEventsFeed';
+import { useEventRecommendations } from './useEventRecommendations';
 import { useMarkerHighlight } from './useMarkerHighlight';
 
 /**
@@ -21,6 +22,11 @@ export function EventsResults({ feed }: { feed: EventsFeed }) {
   const radiusKm = useEventsFilters((state) => state.radiusKm);
   const { events } = feed;
   const { listRef, highlightId } = useMarkerHighlight(events);
+  const recommendations = useEventRecommendations(past || feed.activeSearch !== '');
+  const forYou = <ForYouEvents events={events} recommendations={recommendations} />;
+  // Recommendations lead; the invite to choose interests waits after the first day, so the
+  // half-open sheet on a phone still shows events, not a banner.
+  const invites = recommendations?.personalized === false;
 
   const [ongoing, upcoming] = useMemo(() => {
     if (!events || past) return [[], events ?? []];
@@ -37,7 +43,7 @@ export function EventsResults({ feed }: { feed: EventsFeed }) {
 
   return (
     <div ref={listRef} className="flex flex-col gap-3">
-      <ForYouEvents events={events} hidden={past || feed.activeSearch !== ''} />
+      {!invites && forYou}
       <OngoingStrip events={ongoing} />
       {!past && <MyEvents />}
       {events.length === 0 ? (
@@ -50,9 +56,11 @@ export function EventsResults({ feed }: { feed: EventsFeed }) {
             distanceOrigin={feed.distanceOrigin}
             distanceOnly={radiusKm !== null}
             highlightId={highlightId}
+            afterFirstGroup={invites ? forYou : undefined}
           />
         )
       )}
+      {invites && upcoming.length === 0 && forYou}
       {feed.hasMore && (
         <Button
           variant="secondary"

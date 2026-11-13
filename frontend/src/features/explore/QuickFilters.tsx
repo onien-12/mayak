@@ -1,4 +1,4 @@
-import { Accessibility, CalendarCheck, CircleCheck, Shapes, Wallet } from 'lucide-react';
+import { Accessibility, Shapes, Wallet } from 'lucide-react';
 
 import type { Category, FieldDef, Layer } from '@/shared/api';
 import { Chip, Select } from '@/shared/ui';
@@ -46,14 +46,12 @@ function AttributeFilter({ field }: { field: FieldDef }) {
 }
 
 /**
- * «Бесплатно», «Доступная среда», archive toggles, the nameless background objects and attribute
- * filters of the chosen category.
+ * «Бесплатно», «Доступная среда», the nameless background objects and attribute filters of the
+ * chosen category.
  */
 export function QuickFilters({ layers, category }: QuickFiltersProps) {
   const free = useExploreFilters((state) => state.free);
   const accessible = useExploreFilters((state) => state.accessible);
-  const includePast = useExploreFilters((state) => state.includePast);
-  const includeResolved = useExploreFilters((state) => state.includeResolved);
   const includeUnnamed = useExploreFilters((state) => state.includeUnnamed);
   const toggleFlag = useExploreFilters((state) => state.toggleFlag);
 
@@ -74,26 +72,6 @@ export function QuickFilters({ layers, category }: QuickFiltersProps) {
       >
         Доступная среда
       </Chip>
-      {layers.includes('event') && (
-        <Chip
-          icon={CalendarCheck}
-          tone="event"
-          selected={includePast}
-          onClick={() => toggleFlag('includePast')}
-        >
-          Прошедшие события
-        </Chip>
-      )}
-      {layers.includes('issue') && (
-        <Chip
-          icon={CircleCheck}
-          tone="issue"
-          selected={includeResolved}
-          onClick={() => toggleFlag('includeResolved')}
-        >
-          Решённые проблемы
-        </Chip>
-      )}
       {(layers.includes('infrastructure') || layers.includes('tourism')) && (
         <Chip
           icon={Shapes}

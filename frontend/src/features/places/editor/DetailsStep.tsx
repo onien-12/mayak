@@ -14,6 +14,7 @@ import {
   type PlaceDetail,
 } from '@/shared/api';
 import { useReverseGeocode } from '@/shared/hooks';
+import { FORMAT_SLUGS } from '@/shared/lib/eventFormats';
 import { LAYER_META } from '@/shared/lib/labels';
 import { applyServerErrors } from '@/shared/lib/serverErrors';
 import {
@@ -36,7 +37,15 @@ import { EventFields } from './EventFields';
 import { IssueFields } from './IssueFields';
 import { OptionalDetails } from './OptionalDetails';
 import { PhotoPicker } from './PhotoPicker';
-import { toPlaceInput, toPlaceUpdate, type PlaceDraft, type PlaceFormValues } from './placeForm';
+import { AttributeFields } from './AttributeFields';
+import {
+  splitFields,
+  toPlaceInput,
+  toPlaceUpdate,
+  withCategoryDefaults,
+  type PlaceDraft,
+  type PlaceFormValues,
+} from './placeForm';
 import { placeSchema } from './placeSchema';
 import { PublishNotice } from './PublishNotice';
 import type { StepFrame } from './StepFrame';
@@ -101,6 +110,25 @@ const COPY: Record<Layer, typeof PLACE_COPY> = {
   issue: { ...PLACE_COPY, title: 'Коротко: что случилось' },
 };
 
+/** The resident formats speak their own words (SPEC §3.4). */
+const FORMAT_COPY: Record<string, typeof PLACE_COPY> = {
+  [FORMAT_SLUGS.swap]: {
+    titleLabel: 'Название раздачи',
+    title: 'Например: Раздаю детские вещи и книги',
+    description: 'Где именно, во сколько, что будет с тем, что не разберут',
+  },
+  [FORMAT_SLUGS.help]: {
+    titleLabel: 'Что нужно сделать',
+    title: 'Например: Перенести диван на третий этаж',
+    description: 'Подробнее: сколько займёт, есть ли лифт, чем отблагодарите',
+  },
+  [FORMAT_SLUGS.venue]: {
+    titleLabel: 'Название площадки',
+    title: 'Например: Зал на втором этаже коворкинга',
+    description: 'Что внутри: столы, проектор, коврики, раздевалка; как найти вход',
+  },
+};
+
 interface DetailsStepProps {
   frame: StepFrame;
   draft: PlaceDraft;
@@ -142,13 +170,17 @@ export function DetailsStep({
     () => restored !== null && !editing && hasContent(restored),
   );
   const [photos, setPhotos] = useState<Photo[]>(restored?.photos ?? editing?.photos ?? []);
+  const [freshValues] = useState(() =>
+    editing ? defaultValues : withCategoryDefaults(defaultValues, draft.category),
+  );
   const [initialValues] = useState<PlaceFormValues>(() => {
-    if (!restored) return defaultValues;
+    if (!restored) return freshValues;
     const samePoint = restored.point.lat === lat && restored.point.lng === lng;
     return {
       ...restored.values,
       address: samePoint ? restored.values.address : defaultValues.address,
-      attributes: restored.categoryId === categoryId ? restored.values.attributes : {},
+      attributes:
+        restored.categoryId === categoryId ? restored.values.attributes : freshValues.attributes,
     };
   });
   const form = useForm<PlaceFormValues>({
@@ -181,13 +213,13 @@ export function DetailsStep({
   }, [subscribe, getValues, scope, categoryId, lat, lng, photos]);
 
   const startOver = () => {
-    form.reset(defaultValues);
+    form.reset(freshValues);
     setPhotos([]);
     setContinued(false);
   };
   const { errors } = formState;
-  const { fields } = draft.category;
-  const copy = COPY[draft.layer];
+  const { primary, optional } = splitFields(draft.category);
+  const copy = FORMAT_COPY[draft.category.slug] ?? COPY[draft.layer];
 
   useEffect(() => setSnap('full'), [setSnap]);
 
@@ -299,7 +331,11 @@ export function DetailsStep({
             />
           </Field>
 
-          {draft.layer === 'event' && <EventFields allowRepeat={!editing} />}
+          {/* A format's own questions (what is given away, what a venue offers) come first. */}
+          {primary.length > 0 && <AttributeFields fields={primary} inOrder />}
+          {draft.layer === 'event' && (
+            <EventFields allowRepeat={!editing} slug={draft.category.slug} />
+          )}
           {draft.layer === 'issue' && <IssueFields point={draft.point} />}
 
           <Field
@@ -354,7 +390,7 @@ export function DetailsStep({
           </Field>
 
           <OptionalDetails
-            fields={fields}
+            fields={optional}
             tips={draft.layer === 'tourism'}
             initiallyOpen={Boolean(editing)}
           />

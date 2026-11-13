@@ -70,6 +70,8 @@ from app.services import (
     standing,
     verification,
 )
+from app.services.quests import authoring as quest_authoring
+from app.services.quests import lookup as quest_lookup
 
 DEFAULT_LIMIT = 50
 MAX_LIMIT = 200
@@ -274,6 +276,7 @@ async def _photo_reviews(session: AsyncSession, case: ModerationCase) -> list[Ph
     elif case.target_type is AiTarget.ROUTE:
         route = await routes.find_route(session, case.target_id)
         photos = [photo for stop in route.stops for photo in stop.photos] if route is not None else []
+        photos += await quest_lookup.photos(session, case.target_id)
     else:
         photos = await session.scalars(select(Photo).where(Photo.id == case.target_id))
     photos = [photo for photo in photos if photo.credit is None]
@@ -310,6 +313,7 @@ async def _build_detail(session: AsyncSession, case: ModerationCase, moderator: 
     now = utcnow()
     place_detail = None
     route_detail = None
+    quest_detail = None
     entries = []
     if case.target_type is AiTarget.PLACE:
         place = await place_queries.get_place(session, case.target_id)
@@ -319,6 +323,9 @@ async def _build_detail(session: AsyncSession, case: ModerationCase, moderator: 
         route = await routes.find_route(session, case.target_id)
         if route is not None:
             route_detail = await routes.build_detail(session, route, moderator, now)
+            quest = await quest_authoring.find(session, route.id)
+            if quest is not None:
+                quest_detail = await quest_authoring.build_editor(session, quest, moderator)
     ai_review = await moderation_cases.latest_ai_review(session, case.target_type, case.target_id)
     hold = await quiet_holds.find(session, case.target_type, case.target_id)
     usefulness = None
@@ -332,6 +339,7 @@ async def _build_detail(session: AsyncSession, case: ModerationCase, moderator: 
         ),
         place=place_detail,
         route=route_detail,
+        quest=quest_detail,
         complaints=await _case_complaints(session, case.id),
         clarifications=await _clarifications(session, case),
         flags=case.flags,
@@ -490,7 +498,12 @@ async def _decide_route(
                 await screening.confirm(session, hold, now, penalize=False)
             route.status = RouteStatus.PENDING
     route.updated_at = now
-    _notify_author(session, case, moderator, payload, notifications.route_link(route.id), now)
+    link = (
+        quest_lookup.quest_link(route.id)
+        if await quest_lookup.is_quest(session, route.id)
+        else notifications.route_link(route.id)
+    )
+    _notify_author(session, case, moderator, payload, link, now)
 
 
 def log_decision(

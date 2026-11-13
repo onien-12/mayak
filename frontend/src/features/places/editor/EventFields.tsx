@@ -1,5 +1,6 @@
 import { Controller, useFormContext, useWatch } from 'react-hook-form';
 
+import { eventWording, FORMAT_SLUGS } from '@/shared/lib/eventFormats';
 import { toLocalInputValue } from '@/shared/lib/format';
 import { Field, Input, Switch } from '@/shared/ui';
 
@@ -7,8 +8,14 @@ import type { PlaceFormValues } from './placeForm';
 
 const DEFAULT_DURATION_MS = 2 * 3_600_000;
 
+interface EventFieldsProps {
+  allowRepeat: boolean;
+  /** Category slug: a giveaway and a request for help are free, and help is always a meetup. */
+  slug: string;
+}
+
 /** Event-only fields: time (required), then price, seats and the meetup / repeat options. */
-export function EventFields({ allowRepeat }: { allowRepeat: boolean }) {
+export function EventFields({ allowRepeat, slug }: EventFieldsProps) {
   const {
     control,
     register,
@@ -28,9 +35,29 @@ export function EventFields({ allowRepeat }: { allowRepeat: boolean }) {
       { shouldDirty: true, shouldValidate: isSubmitted },
     );
   };
-  const isMeetup = useWatch({ control, name: 'event.is_meetup' });
+  const watchedMeetup = useWatch({ control, name: 'event.is_meetup' });
   const repeat = useWatch({ control, name: 'event.repeat' });
   const error = errors.event;
+  const isHelp = slug === FORMAT_SLUGS.help;
+  // The server keeps both formats free and their contact for participants only (SPEC §3.4).
+  const fixedFormat = isHelp || slug === FORMAT_SLUGS.swap;
+  const isMeetup = fixedFormat || watchedMeetup;
+
+  const capacity = (
+    <Field
+      label={isHelp ? 'Сколько нужно помощников' : 'Мест'}
+      htmlFor="event-capacity"
+      hint={isHelp ? 'Пусто — сколько откликнется' : 'Пусто — без ограничений'}
+      error={error?.capacity?.message}
+    >
+      <Input
+        id="event-capacity"
+        inputMode="numeric"
+        invalid={Boolean(error?.capacity)}
+        {...register('event.capacity')}
+      />
+    </Field>
+  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -63,54 +90,53 @@ export function EventFields({ allowRepeat }: { allowRepeat: boolean }) {
         </Field>
       </div>
 
-      <Controller
-        control={control}
-        name="event.is_meetup"
-        render={({ field }) => (
-          <Switch
-            checked={field.value}
-            onChange={field.onChange}
-            label="Небольшая встреча"
-            description="Игра, прогулка, субботник — контакт увидят только участники"
-          />
-        )}
-      />
+      {!fixedFormat && (
+        <Controller
+          control={control}
+          name="event.is_meetup"
+          render={({ field }) => (
+            <Switch
+              checked={field.value}
+              onChange={field.onChange}
+              label="Контакт только для участников"
+              description="Ваш контакт увидят те, кто нажал «Я пойду», а в списке событий будет видно, сколько мест осталось. Для большого события выключите"
+            />
+          )}
+        />
+      )}
 
-      <div className="grid grid-cols-2 gap-3">
-        <Field
-          label="Цена, ₽"
-          htmlFor="event-price"
-          hint="Пусто — бесплатно"
-          error={error?.price?.message}
-        >
-          <Input
-            id="event-price"
-            inputMode="numeric"
-            placeholder="0"
-            invalid={Boolean(error?.price)}
-            {...register('event.price')}
-          />
-        </Field>
-        <Field
-          label="Мест"
-          htmlFor="event-capacity"
-          hint="Пусто — без ограничений"
-          error={error?.capacity?.message}
-        >
-          <Input
-            id="event-capacity"
-            inputMode="numeric"
-            invalid={Boolean(error?.capacity)}
-            {...register('event.capacity')}
-          />
-        </Field>
-      </div>
+      {fixedFormat ? (
+        capacity
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          <Field
+            label="Цена, ₽"
+            htmlFor="event-price"
+            hint="Пусто — бесплатно"
+            error={error?.price?.message}
+          >
+            <Input
+              id="event-price"
+              inputMode="numeric"
+              placeholder="0"
+              invalid={Boolean(error?.price)}
+              {...register('event.price')}
+            />
+          </Field>
+          {capacity}
+        </div>
+      )}
 
       {isMeetup ? (
         <Field
           label="Как с вами связаться"
           htmlFor="event-contact"
           optional
+          hint={
+            isHelp
+              ? 'Увидят только те, кто откликнется'
+              : `Увидят только те, кто нажмёт «${eventWording(slug).join}»`
+          }
           error={error?.contact?.message}
         >
           <Input

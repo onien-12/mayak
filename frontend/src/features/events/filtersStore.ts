@@ -5,8 +5,6 @@ import type { ContentOrigin, EventsSort } from '@/shared/api';
 
 /** Preset periods of the afisha; `custom` uses `range`. */
 export type TimePreset = 'any' | 'today' | 'tomorrow' | 'weekend' | 'week' | 'month' | 'custom';
-/** `city` = everything except meetups. */
-export type EventKind = 'all' | 'city' | 'meetups';
 export type EventOrigin = 'all' | ContentOrigin;
 
 /** Custom period, inclusive local days `YYYY-MM-DD`. */
@@ -19,7 +17,6 @@ export interface EventsFilters {
   time: TimePreset;
   range: DayRange | null;
   categoryIds: number[];
-  kind: EventKind;
   origin: EventOrigin;
   free: boolean;
   past: boolean;
@@ -35,7 +32,6 @@ interface EventsFiltersState extends EventsFilters {
   setTime: (time: Exclude<TimePreset, 'custom'>) => void;
   setRange: (range: DayRange) => void;
   toggleCategory: (id: number) => void;
-  setKind: (kind: EventKind) => void;
   setOrigin: (origin: EventOrigin) => void;
   toggleFree: () => void;
   togglePast: () => void;
@@ -48,7 +44,6 @@ const DEFAULTS: EventsFilters = {
   time: 'any',
   range: null,
   categoryIds: [],
-  kind: 'all',
   // What residents arrange themselves is the point of the section; city listings are a filter away.
   origin: 'community',
   free: false,
@@ -70,7 +65,6 @@ export const useEventsFilters = create<EventsFiltersState>()(
         const ids = get().categoryIds;
         set({ categoryIds: ids.includes(id) ? ids.filter((value) => value !== id) : [...ids, id] });
       },
-      setKind: (kind) => set({ kind }),
       setOrigin: (origin) => set({ origin }),
       // Among free events there is nothing to order by price.
       toggleFree: () => {
@@ -84,10 +78,16 @@ export const useEventsFilters = create<EventsFiltersState>()(
     }),
     {
       name: 'mayak-events',
-      version: 2,
-      // v1 remembered «все» as the default source; the section now opens on residents' events.
-      migrate: (stored, version) =>
-        version < 2 ? { ...(stored as EventsFilters), origin: DEFAULTS.origin } : stored,
+      version: 4,
+      migrate: (stored, version) => {
+        // v1 remembered «все» as the default source; the section now opens on residents' events.
+        const state = (
+          version < 2 ? { ...(stored as object), origin: DEFAULTS.origin } : stored
+        ) as EventsFiltersState & { kind?: string; signUpOnly?: boolean };
+        // v2 had a «Формат» choice and v3 a «С записью» chip; both are gone — all events show.
+        const { kind: _kind, signUpOnly: _signUpOnly, ...rest } = state;
+        return rest;
+      },
       partialize: ({ search: _search, ...state }) => state,
     },
   ),
@@ -97,7 +97,6 @@ export const useEventsFilters = create<EventsFiltersState>()(
 export function countActiveFilters(filters: EventsFilters): number {
   return (
     filters.categoryIds.length +
-    Number(filters.kind !== 'all') +
     Number(filters.origin !== DEFAULTS.origin) +
     Number(filters.free) +
     Number(filters.past) +

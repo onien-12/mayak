@@ -9,7 +9,7 @@ import { EmptyState, OsmCredit, Rise, TextCreditNote } from '@/shared/ui';
 import { AreaCover } from './AreaCover';
 import { AreaHighlights } from './AreaHighlights';
 import { AreaPlaces } from './AreaPlaces';
-import { AreaSideSections } from './AreaSections';
+import { AreaEventsSection, AreaProblemsSection } from './AreaSections';
 import { InterestBlock } from './InterestBlock';
 
 const isInner = (place: PlaceCard) => place.layer === 'infrastructure' || place.layer === 'tourism';
@@ -20,7 +20,11 @@ interface AreaBodyProps {
   notes?: ReactNode;
 }
 
-/** Content of the area card, phone-first: cover, title, interest, what is here, the rest. */
+/**
+ * Content of the area card, phone-first: cover, title, interest, the upcoming events inside
+ * (residents' first), what is here, the open problems, the rest. Events and problems are text
+ * here — never pins on the «Карта» — and open in their own sections.
+ */
 export function AreaBody({ area, notes }: AreaBodyProps) {
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const inner = area.places.filter(isInner);
@@ -37,6 +41,7 @@ export function AreaBody({ area, notes }: AreaBodyProps) {
         />
         <TopicChips topics={area.topics} label="О чём эта локация" className="-mt-1" />
         <InterestBlock area={area} />
+        <AreaEventsSection places={area.places} />
         <ElsewhereLinks title={area.title} point={area} twoGisUrl={area.external_rating?.url} />
 
         {area.description && (
@@ -63,7 +68,7 @@ export function AreaBody({ area, notes }: AreaBodyProps) {
           />
         )}
 
-        <AreaSideSections places={area.places} />
+        <AreaProblemsSection places={area.places} />
         <ReviewFeed target={externalTarget('area', area)} title="Отзывы" lazy />
         {notes}
 

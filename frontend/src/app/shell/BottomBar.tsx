@@ -1,4 +1,4 @@
-import { UserRound } from 'lucide-react';
+import { Menu } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Link, useLocation } from 'react-router';
 
@@ -7,7 +7,13 @@ import { cn } from '@/shared/lib/cn';
 import { Avatar, SPRING } from '@/shared/ui';
 
 import { TAB_BAR_HEIGHT } from './layout';
-import { isNavItemActive, OUTAGES_NAV, PRIMARY_NAV, useIsOverlayRoute } from './navigation';
+import {
+  isNavItemActive,
+  PROBLEMS_NAV,
+  SAVED_NAV,
+  TAB_BAR_NAV,
+  useIsOverlayRoute,
+} from './navigation';
 import { UserMenu } from './UserMenu';
 
 const TAB =
@@ -25,13 +31,16 @@ function ActiveMark({ active }: { active: boolean }) {
   );
 }
 
-/** Phone tab bar: four sections and the account menu. */
+/** Phone tab bar: four sections and «Ещё» — the menu of the other sections and the account. */
 export function BottomBar() {
   const { pathname } = useLocation();
   const { user } = useAuth();
-  // The account tab also holds the secondary sections: profile pages, statistics,
-  // moderation and outages — it is the active tab while one of them is open.
-  const inMenu = useIsOverlayRoute() || isNavItemActive(OUTAGES_NAV, pathname);
+  // «Ещё» holds the other sections and the account: problems, favourites, statistics,
+  // moderation, profile pages — it is the active tab while one of them is open.
+  const inMenu =
+    useIsOverlayRoute() ||
+    isNavItemActive(PROBLEMS_NAV, pathname) ||
+    isNavItemActive(SAVED_NAV, pathname);
 
   return (
     <nav
@@ -39,7 +48,7 @@ export function BottomBar() {
       className="absolute inset-x-0 bottom-0 z-40 border-t border-line bg-surface pb-safe"
     >
       <div className="flex" style={{ height: TAB_BAR_HEIGHT }}>
-        {PRIMARY_NAV.map((item) => {
+        {TAB_BAR_NAV.map((item) => {
           const active = isNavItemActive(item, pathname);
           const Icon = item.icon;
           return (
@@ -68,9 +77,9 @@ export function BottomBar() {
               {user ? (
                 <Avatar id={user.id} name={user.display_name} size={24} />
               ) : (
-                <UserRound size={22} aria-hidden />
+                <Menu size={22} aria-hidden />
               )}
-              {user ? 'Профиль' : 'Войти'}
+              Ещё
             </button>
           )}
         />

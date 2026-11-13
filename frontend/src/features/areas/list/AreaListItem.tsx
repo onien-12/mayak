@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 import { ForYouMark, TopicChips } from '@/features/interests';
 import { useAreaParam } from '@/features/map';
-import type { AreaCard } from '@/shared/api';
+import type { AreaCard, CommunityEventRef } from '@/shared/api';
 import { useCategories } from '@/shared/hooks';
 import { cn } from '@/shared/lib/cn';
 import { pluralize, PLURALS } from '@/shared/lib/format';
@@ -13,6 +13,7 @@ import { CategoryGlyph, CoverSourceMark, CreditMark, ListRating } from '@/shared
 import { AreaPlaceholder } from '../card/AreaCover';
 import { InterestMeter } from '../card/InterestMeter';
 import { shownInterest } from '../lib/interest';
+import { CommunityEventLine } from './CommunityEventLine';
 
 const HIGHLIGHT_ICONS = 4;
 
@@ -38,17 +39,25 @@ export function AreaThumb({ area }: { area: AreaCard }) {
   );
 }
 
+interface AreaListItemProps {
+  area: AreaCard;
+  /** The residents' event to name instead of the nearest one: what «Для вас» recommends it for. */
+  event?: CommunityEventRef | null;
+  className?: string;
+}
+
 /**
  * Rich list card of an area (explore, search): cover, kind, interest tier with a meter,
- * the count of places and what is inside. With a personal interest (SPEC §23.4) the tier and
- * meter show it, marked «для вас» with the reasons; the general tier stays in the tooltip.
- * Opens the area card.
+ * the count of places, the residents' upcoming event inside («Скоро здесь: …», opens it) and
+ * what is inside. With a personal interest (SPEC §23.4) the tier and meter show it, marked
+ * «для вас» with the reasons; the general tier stays in the tooltip. Opens the area card.
  */
-export function AreaListItem({ area, className }: { area: AreaCard; className?: string }) {
+export function AreaListItem({ area, event, className }: AreaListItemProps) {
   const { openArea } = useAreaParam();
   const { byId } = useCategories();
   const kind = AREA_KIND_META[area.kind];
   const interest = shownInterest(area);
+  const soon = event ?? area.next_community_event;
   const tier = interest.tier;
   const highlights = area.highlights
     .map((item) => byId.get(item.category_id))
@@ -112,6 +121,7 @@ export function AreaListItem({ area, className }: { area: AreaCard; className?: 
           </span>
           <ListRating item={area} ownLabel="Средняя оценка мест" className="ml-auto" />
         </div>
+        {soon && <CommunityEventLine event={soon} more={area.community_events_upcoming - 1} />}
         {interest.personal && (
           <TopicChips
             topics={interest.reasons}

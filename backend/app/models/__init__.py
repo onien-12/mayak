@@ -11,11 +11,13 @@ from app.models.external_rating import ExternalRatingCache
 from app.models.feedback import Comment, Review
 from app.models.interest import InterestTag, InterestTagState, UserInterest, UserInterestSettings
 from app.models.issue import ImportRun, IssueDetails, OutageBuilding
+from app.models.lost_found import LostItem, LostItemPhoto, LostItemReport, LostMatch, LostResponse
 from app.models.moderation import Complaint, ModerationCase, ModerationLog
 from app.models.note import MapNote, NoteReport
 from app.models.notification import Notification
 from app.models.photo_metrics import PhotoMetrics
 from app.models.place import Favorite, Photo, Place, PlaceHistory
+from app.models.quest import Quest, QuestRun, QuestRunMember, QuestStage
 from app.models.reputation import ReputationEvent
 from app.models.route import Route, RouteSave, RouteStop
 from app.models.screening import AuthorStanding, PlaceQuality, QuietHold, StandingEvent
@@ -42,6 +44,11 @@ __all__ = [
     "InterestTag",
     "InterestTagState",
     "IssueDetails",
+    "LostItem",
+    "LostItemPhoto",
+    "LostItemReport",
+    "LostMatch",
+    "LostResponse",
     "MapNote",
     "ModerationCase",
     "ModerationLog",
@@ -53,6 +60,10 @@ __all__ = [
     "Place",
     "PlaceHistory",
     "PlaceQuality",
+    "Quest",
+    "QuestRun",
+    "QuestRunMember",
+    "QuestStage",
     "QuietHold",
     "ReputationEvent",
     "Respect",

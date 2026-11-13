@@ -69,7 +69,7 @@ export function ExplorePanel() {
       : undefined;
   const scope = results.activeSearch
     ? `по запросу «${results.activeSearch}»`
-    : 'в этой области · ближайшие сверху';
+    : 'в этой области · сначала от жителей, ближние выше';
 
   // «Для вас» leads the list (SPEC §23.5); a text search makes the list about the query instead.
   const forYou = useForYouMap({

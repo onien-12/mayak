@@ -3,6 +3,8 @@
  * JSON is snake_case; datetimes are ISO 8601 UTC strings; line geometry is `[lng, lat][]`.
  */
 
+import type { QuestEditor } from './questTypes';
+
 // ── Enums ───────────────────────────────────────────────────────────────────────────────
 
 export type Layer = 'infrastructure' | 'event' | 'tourism' | 'issue';
@@ -56,9 +58,9 @@ export type ComplaintReason =
   'inaccurate' | 'duplicate' | 'outdated' | 'spam' | 'offensive' | 'rules' | 'fraud' | 'impassable';
 export type TargetType = 'place' | 'route';
 /** What a moderation case can be about: held photos, comments, reviews and notes have their own (SPEC §24.1). */
-export type ModerationTarget = TargetType | 'photo' | 'comment' | 'review' | 'note';
+export type ModerationTarget = TargetType | 'photo' | 'comment' | 'review' | 'note' | HeldKind;
 /** A photo, comment, review or note held on its own. */
-export type HeldKind = 'photo' | 'comment' | 'review' | 'note';
+export type HeldKind = 'photo' | 'comment' | 'review' | 'note' | 'lost_item' | 'lost_response';
 export type HoldState = 'screening' | 'held' | 'released' | 'decided';
 /** Who held it: the keyboard-mashing heuristic, the model, or a check that did not happen for an author with low standing. */
 export type HoldSource = 'heuristic' | 'ai' | 'standing';
@@ -103,7 +105,8 @@ export type NotificationKind =
   | 'place_verified'
   | 'level_up'
   | 'issue_update'
-  | 'territory';
+  | 'territory'
+  | 'lost_found';
 export type HistoryKind =
   | 'created'
   | 'edited'
@@ -417,6 +420,21 @@ export interface EventDetail extends EventBrief {
   is_joined: boolean;
 }
 
+/** `PUT /places/{id}/event/participation` body; may be omitted. */
+export interface EventJoinInput {
+  /** Swap only (SPEC §3.4): what the participant brings, posted as «Принесу: …» in the discussion. */
+  note?: string;
+}
+
+/** What a participant of a swap brings — their «Принесу: …» comment without the prefix. */
+export interface EventContribution {
+  comment_id: number;
+  author: UserBrief;
+  text: string;
+  /** The viewer's own note still being checked: only they and moderators see it. */
+  on_review: boolean;
+}
+
 /** Utility outage imported from VL.ru (SPEC §15). */
 export interface OutageBrief {
   number: string;
@@ -532,11 +550,27 @@ export interface AreaCard {
   /** Top categories by count (≤ 5). */
   highlights: AreaHighlight[];
   events_upcoming: number;
+  /** Of `events_upcoming`, those residents made. */
+  community_events_upcoming: number;
+  /** The nearest of them by start — «Скоро здесь: …», opens the event. */
+  next_community_event: CommunityEventRef | null;
+  /**
+   * A small OpenStreetMap territory with nothing residents made inside: not drawn or listed on
+   * «Карта» unless «Всё из OpenStreetMap» is on or a search finds it (SPEC §18).
+   */
+  bare_background: boolean;
   issues_open: number;
   /** Territory imported from OpenStreetMap → show «© участники OpenStreetMap». */
   external: ExternalSource | null;
   /** SPEC §23.4: `null` without an interest profile, absent on an older backend → show `interest`. */
   personal_interest?: PersonalInterest | null;
+}
+
+/** An upcoming event residents made inside a location (SPEC §17). */
+export interface CommunityEventRef {
+  id: number;
+  title: string;
+  starts_at: string;
 }
 
 /** Interest moved towards the viewer (SPEC §23). `topics`: why — the 1–2 best matching topics. */
@@ -882,6 +916,8 @@ export interface Recommendation {
   area: AreaCard | null;
   /** Set when `type = "place"`. */
   place: PlaceCard | null;
+  /** A location recommended for the residents' upcoming event inside it: name it as the reason. */
+  reason_event: CommunityEventRef | null;
 }
 
 export type RecommendationsScope = 'map' | 'events';
@@ -1219,6 +1255,8 @@ export interface ClarificationItem {
 export interface ModerationCaseDetail extends ModerationCase {
   place: PlaceDetail | null;
   route: RouteDetail | null;
+  /** Set when the route is a quest (SPEC §27): every stage, as its author sees them. */
+  quest?: QuestEditor | null;
   complaints: ComplaintItem[];
   /** What residents asked to clarify about the place, newest first. */
   clarifications?: ClarificationItem[];

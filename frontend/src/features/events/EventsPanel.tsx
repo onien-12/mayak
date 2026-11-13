@@ -1,22 +1,23 @@
-import { CalendarPlus, RotateCcw, SlidersHorizontal, Users } from 'lucide-react';
+import { ChevronDown, RotateCcw, SlidersHorizontal } from 'lucide-react';
 import { useState } from 'react';
 
 import { useSearchSignal } from '@/features/interests';
 import { useMapPlaces } from '@/features/map';
 import { useIsDesktop } from '@/shared/hooks';
+import { cn } from '@/shared/lib/cn';
 import { plural, PLURALS } from '@/shared/lib/format';
-import { Button, IconButton, PanelLayout, Spinner } from '@/shared/ui';
+import { Button, IconButton, PanelLayout, Spinner, usePanelStore } from '@/shared/ui';
 
+import { CreateMenu } from './CreateMenu';
 import { EventsFilters } from './EventsFilters';
-import { EventsFiltersSheet } from './EventsFiltersSheet';
 import { EventsResults } from './EventsResults';
 import { EventsSearch } from './EventsSearch';
-import { EventsTopBar, FilterCount } from './EventsTopBar';
 import { countActiveFilters, useEventsFilters } from './filtersStore';
 import { periodPhrase } from './period';
-import { startCreateEvent } from './startCreateEvent';
 import { TimeChips } from './TimeChips';
 import { useEventsFeed, type EventsFeed } from './useEventsFeed';
+
+const FILTERS_ID = 'events-filters';
 
 function feedTitle(feed: EventsFeed): string {
   if (feed.isLoading) return 'Ищем события…';
@@ -26,45 +27,53 @@ function feedTitle(feed: EventsFeed): string {
   return `${count}${feed.hasMore ? '+' : ''} ${plural(count, PLURALS.event)}`;
 }
 
-/** Desktop: format, source, categories and sorting behind a disclosure. */
-function DesktopFilters({ activeFilters }: { activeFilters: number }) {
+/** Number of active filters on the «Фильтры» control. */
+function FilterCount({ count }: { count: number }) {
+  if (count === 0) return null;
   return (
-    <details className="group rounded-card border border-line/70">
-      <summary className="flex h-11 cursor-pointer list-none items-center justify-between px-3.5 text-sm font-semibold text-ink [&::-webkit-details-marker]:hidden">
-        <span className="flex items-center gap-2">
-          <SlidersHorizontal size={16} aria-hidden className="text-ink-soft" />
-          Фильтры и сортировка
-          <FilterCount count={activeFilters} />
-        </span>
-        <span className="text-xs font-normal text-ink-faint group-open:hidden">показать</span>
-      </summary>
-      <div className="animate-fade-in px-3.5 pt-1 pb-4">
-        <EventsFilters />
-      </div>
-    </details>
+    <span className="rounded-full bg-brand px-1.5 text-2xs leading-[18px] font-semibold text-white">
+      {count}
+    </span>
   );
 }
 
-function CreateActions() {
+interface FiltersToggleProps {
+  open: boolean;
+  count: number;
+  onToggle: () => void;
+}
+
+function FiltersToggle({ open, count, onToggle }: FiltersToggleProps) {
   return (
-    <div className="flex gap-2 max-[379px]:[&_svg]:hidden [&>*]:flex-1 [&>*]:px-3">
-      <Button icon={CalendarPlus} onClick={() => startCreateEvent(false)}>
-        Создать событие
-      </Button>
-      <Button variant="secondary" icon={Users} onClick={() => startCreateEvent(true)}>
-        Собрать встречу
-      </Button>
-    </div>
+    <Button
+      variant="secondary"
+      icon={SlidersHorizontal}
+      aria-expanded={open}
+      aria-controls={FILTERS_ID}
+      onClick={onToggle}
+      className="shrink-0 px-3"
+    >
+      Фильтры
+      <FilterCount count={count} />
+      <ChevronDown
+        size={16}
+        aria-hidden
+        className={cn('text-ink-faint transition-transform duration-200', open && 'rotate-180')}
+      />
+    </Button>
   );
 }
 
 /**
  * «События». Residents' own events and meetups come first — that is the default view; the
- * imported city listings (VL.ru) are one filter away. The map shows the same filtered set. Phones: search and period chips float over the map, other filters
- * live in their own sheet. Desktop: everything in the side panel.
+ * imported city listings (VL.ru) are one filter away. The map shows the same filtered set.
+ * One layout for phones and desktop: search, the «Фильтры» toggle and the period chips sit in
+ * the panel above the list they filter — nothing floats over the map; the other filters open at
+ * the top of the list.
  */
 export default function EventsPanel() {
   const isDesktop = useIsDesktop();
+  const setSnap = usePanelStore((state) => state.setSnap);
   const filters = useEventsFilters();
   const feed = useEventsFeed();
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -79,34 +88,20 @@ export default function EventsPanel() {
   ]
     .filter(Boolean)
     .join(' · ');
-  const refreshing = feed.isRefreshing && <Spinner size={16} className="mr-3" />;
-
-  if (!isDesktop) {
-    return (
-      <>
-        <EventsTopBar activeFilters={activeFilters} onOpenFilters={() => setFiltersOpen(true)} />
-        <PanelLayout
-          title={feedTitle(feed)}
-          subtitle={subtitle}
-          actions={refreshing}
-          footer={<CreateActions />}
-        >
-          <EventsResults feed={feed} />
-        </PanelLayout>
-        <EventsFiltersSheet
-          open={filtersOpen}
-          onClose={() => setFiltersOpen(false)}
-          confirmLabel={feed.events?.length ? `Показать ${feedTitle(feed)}` : 'Готово'}
-          activeFilters={activeFilters}
-        />
-      </>
-    );
-  }
+  // Phones: the sheet scrolls only at full height, and the keyboard needs the room anyway.
+  const expand = () => {
+    if (!isDesktop) setSnap('full');
+  };
+  const toggleFilters = () => {
+    if (!filtersOpen) expand();
+    setFiltersOpen(!filtersOpen);
+  };
 
   return (
     <PanelLayout
-      title="События"
-      subtitle="Встречи и события, которые устраивают жители"
+      // Phones: the count is the title — it is what the half-open sheet has room for.
+      title={isDesktop ? 'События' : feedTitle(feed)}
+      subtitle={isDesktop ? 'Встречи и события, которые устраивают жители' : subtitle}
       actions={
         <>
           {feed.isRefreshing && <Spinner size={16} className="mr-1" />}
@@ -116,18 +111,37 @@ export default function EventsPanel() {
         </>
       }
       toolbar={
-        <div className="flex flex-col gap-3">
-          <EventsSearch />
-          <TimeChips className="flex-wrap" />
+        <div className="flex flex-col gap-2">
+          <div className="flex gap-2">
+            <div className="min-w-0 flex-1">
+              <EventsSearch onFocus={expand} />
+            </div>
+            <FiltersToggle open={filtersOpen} count={activeFilters} onToggle={toggleFilters} />
+          </div>
+          {/* Phones: one row that scrolls sideways; the desktop panel has room to wrap. */}
+          <TimeChips className={isDesktop ? 'flex-wrap' : '-mx-4 px-4 [&>*]:h-9'} />
         </div>
       }
-      footer={<CreateActions />}
+      footer={<CreateMenu />}
     >
       <div className="flex flex-col gap-4">
-        <DesktopFilters activeFilters={activeFilters} />
-        <h2 className="-mb-2 text-sm font-semibold text-ink">
-          {feedTitle(feed)} <span className="font-normal text-ink-soft">{subtitle}</span>
-        </h2>
+        {filtersOpen && (
+          <section
+            id={FILTERS_ID}
+            aria-label="Фильтры и сортировка"
+            className="animate-fade-in rounded-card border border-line/70 p-3.5"
+          >
+            <EventsFilters />
+            <Button variant="secondary" block className="mt-4" onClick={toggleFilters}>
+              {feed.events?.length ? `Показать ${feedTitle(feed)}` : 'Скрыть фильтры'}
+            </Button>
+          </section>
+        )}
+        {isDesktop && (
+          <h2 className="-mb-2 text-sm font-semibold text-ink">
+            {feedTitle(feed)} <span className="font-normal text-ink-soft">{subtitle}</span>
+          </h2>
+        )}
         <EventsResults feed={feed} />
       </div>
     </PanelLayout>

@@ -15,14 +15,17 @@ from app.core.database import Database
 from app.core.errors import register_exception_handlers
 from app.core.rate_limit import SlidingWindowLimiter
 from app.domain import geo
+from app.seed.lost_found import apply_lost_found
+from app.seed.quests import apply_demo_quest
 from app.seed.runner import apply_wikimedia, seed_if_empty
-from app.services import areas, uploads, verification
+from app.services import areas, catalog, uploads, verification
 from app.services.ai_moderation.client import OpenRouterClient
 from app.services.ai_moderation.screener import AiScreener, ScreeningSweeper
 from app.services.external_ratings import RatingRefresher
 from app.services.geometry_lookup import GeometryLookup, NominatimClient
 from app.services.interests import tagging as interest_tagging
 from app.services.interests.classifier import ClassifierLoop, InterestClassifier, OpenRouterClassifierClient
+from app.services.lost_found.judge import LostMatcher, MatcherSweeper
 from app.services.route_planner import build_planner
 from app.services.twogis_places import TwoGisPlacesClient
 from app.services.vlru import scheduler as vlru_scheduler
@@ -45,6 +48,31 @@ def _configure_logging() -> None:
         app_logger.propagate = False
 
 
+async def _prepare_database(database: Database, settings: Settings) -> None:
+    """Create missing tables, seed a fresh database and bring derived data up to date."""
+    await database.create_schema()
+    async with database.session_factory() as session:
+        if settings.seed_on_startup:
+            await seed_if_empty(session, settings)
+        synced = await catalog.sync_categories(session)
+        if synced.added or synced.updated:
+            logger.info("Category catalogue synced: %s", synced.summary())
+        wikimedia = await apply_wikimedia(session, utcnow())
+        if wikimedia is not None:
+            logger.info("Wikimedia snapshot applied: %s", wikimedia.summary())
+        lost_found_demo = await apply_lost_found(session, utcnow())
+        if lost_found_demo is not None:
+            logger.info("Lost-and-found demo posts added: %d", lost_found_demo)
+        demo_quest = await apply_demo_quest(session, utcnow())
+        if demo_quest is not None:
+            logger.info("Demo quest added: %d", demo_quest)
+        await verification.refresh_trust_scores(session, utcnow())
+        await uploads.refresh_covers(session, settings.media_dir, utcnow())
+        await areas.refresh_all(session, utcnow())
+        await interest_tagging.tag_stale(session, utcnow())
+        await session.commit()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Prepare the database, then start the background helpers; none of them can block startup."""
@@ -62,21 +90,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.geometry_lookup = GeometryLookup(places_client, boundary_client)
     app.state.rating_refresher = RatingRefresher(places_client, settings.twogis_rating_daily_limit)
     app.state.ai_screener = AiScreener(ai_client, database.session_factory, settings)
-    await database.create_schema()
-    async with database.session_factory() as session:
-        if settings.seed_on_startup:
-            await seed_if_empty(session, settings)
-        wikimedia = await apply_wikimedia(session, utcnow())
-        if wikimedia is not None:
-            logger.info("Wikimedia snapshot applied: %s", wikimedia.summary())
-        await verification.refresh_trust_scores(session, utcnow())
-        await uploads.refresh_covers(session, settings.media_dir, utcnow())
-        await areas.refresh_all(session, utcnow())
-        await interest_tagging.tag_stale(session, utcnow())
-        await session.commit()
+    app.state.lost_matcher = LostMatcher(ai_client, database.session_factory)
+    await _prepare_database(database, settings)
     await app.state.ai_screener.resubmit_stuck()
     sweeper = ScreeningSweeper(lambda: app.state.ai_screener)
     sweeper.start()
+    matcher_sweeper = MatcherSweeper(lambda: app.state.lost_matcher)
+    matcher_sweeper.start()
     importer = vlru_scheduler.VlRuScheduler(
         database.session_factory, VlRuClient(), vlru_scheduler.enabled_jobs(settings)
     )
@@ -103,7 +123,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await classifier_client.aclose()
     await importer.stop()
     await sweeper.stop()
+    await matcher_sweeper.stop()
     await app.state.ai_screener.drain()
+    await app.state.lost_matcher.drain()
     if ai_client is not None:
         await ai_client.aclose()
     await route_planner.aclose()

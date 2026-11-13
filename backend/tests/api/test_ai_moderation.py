@@ -15,6 +15,7 @@ from app.domain.enums import AiTarget, HoldState, PlaceStatus, UserRole
 from app.models import AiReview, AuthorStanding, Place, PlaceQuality, QuietHold
 from tests.conftest import API, Actor, FakeAiClient, World
 
+EVENT_SLUGS = frozenset({"sport", "swap", "help"})
 CASES = json.loads((Path(__file__).parents[1] / "fixtures" / "screening" / "text_cases.json").read_text())
 
 
@@ -423,9 +424,14 @@ async def test_labelled_text_set(world: World, client: AsyncClient, case: dict[s
     author = await world.actor("author", reputation=20)
     fake = world.enable_ai()
     fake.answer = json.dumps(case["answer"], ensure_ascii=False)
-    extra: dict[str, Any] = {"event": world.event_window()} if case["slug"] == "sport" else {}
+    extra: dict[str, Any] = {"event": world.event_window()} if case["slug"] in EVENT_SLUGS else {}
     place = await world.create_place(
-        author, case["slug"], title=case["title"], description=case["description"], **extra
+        author,
+        case["slug"],
+        title=case["title"],
+        description=case["description"],
+        attributes=case.get("attributes", {}),
+        **extra,
     )
     await world.ai_done()
     shown = (await client.get(f"{API}/places/{place['id']}")).status_code == 200

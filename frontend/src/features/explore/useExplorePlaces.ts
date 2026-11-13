@@ -2,17 +2,14 @@ import { keepPreviousData, useQueries, type UseQueryResult } from '@tanstack/rea
 import { useMemo } from 'react';
 
 import { useMap, useMapFolded, useMapViewport, useUserLocation } from '@/features/map';
-import { placesApi, queryKeys, type Layer, type PlaceCard, type PlacesQuery } from '@/shared/api';
+import { placesApi, queryKeys, type PlaceCard, type PlacesQuery } from '@/shared/api';
 import { useCategories, useDebouncedValue } from '@/shared/hooks';
 import { boundsContain, boundsToBbox, haversine, snapBoundsOutward } from '@/shared/lib/geo';
-import { LAYERS } from '@/shared/lib/labels';
 import { isBareBackground, isUnconfirmedOsm } from '@/shared/lib/osm';
 
-import { useExploreFilters, type ExploreFilters } from './filtersStore';
+import { MAP_LAYERS, useExploreFilters, type ExploreFilters } from './filtersStore';
 
 const SEARCH_DEBOUNCE_MS = 350;
-/** Layers of the live imports (afisha events, utility outages) — OpenStreetMap has none. */
-const LIVE_IMPORT_LAYERS: readonly Layer[] = ['event', 'issue'];
 const MIN_SEARCH_LENGTH = 2;
 const NO_PLACES: PlaceCard[] = [];
 
@@ -34,12 +31,12 @@ function buildQuery(
   return {
     bbox: search ? undefined : bbox,
     q: search || undefined,
-    layers: filters.layers.length === LAYERS.length ? undefined : filters.layers,
+    // Always named: the server's default is every layer, and the map shows places only — a
+    // search finds no events or problems here either.
+    layers: filters.layers.filter((layer) => MAP_LAYERS.includes(layer)),
     categories: filters.categoryIds.length > 0 ? filters.categoryIds : undefined,
     min_status: filters.minStatus === 'any' ? undefined : filters.minStatus,
     attrs: attrs.length > 0 ? attrs : undefined,
-    include_past_events: filters.includePast || undefined,
-    include_resolved: filters.includeResolved || undefined,
   };
 }
 
@@ -47,16 +44,11 @@ function buildQuery(
  * The requests behind the map. Zoomed out, the OpenStreetMap base layer (thousands of
  * playgrounds and sports grounds) would fill the server's `limit` — most trusted first — and
  * push residents' new, still unconfirmed places out, so the city view asks for community
- * content and the live imports only; OSM objects come in from `PLACE_UNFOLD_ZOOM` (and their
- * areas count them meanwhile). A search or a category filter asks for everything.
+ * content only; OSM objects come in from `PLACE_UNFOLD_ZOOM` (and their areas count them
+ * meanwhile). A search or a category filter asks for everything.
  */
 function placeQueries(params: PlacesQuery, cityView: boolean): PlacesQuery[] {
-  if (!cityView) return [params];
-  const live = (params.layers ?? LAYERS).filter((layer) => LIVE_IMPORT_LAYERS.includes(layer));
-  return [
-    { ...params, origin: 'community' },
-    ...(live.length > 0 ? [{ ...params, origin: 'external' as const, layers: live }] : []),
-  ];
+  return cityView ? [{ ...params, origin: 'community' }] : [params];
 }
 
 /** One result for the split requests; module-level so it re-runs only when they change. */
@@ -75,8 +67,9 @@ function combinePlaceQueries(results: UseQueryResult<PlaceCard[]>[]) {
 
 /**
  * Places for the explore section: everything matching the filters around the current
- * viewport (for markers) and the part of it that is actually visible, nearest first
- * (for the list). A text search looks through the whole city instead of the viewport.
+ * viewport (for markers) and the part of it that is actually visible, residents' first and
+ * nearest first within that (for the list). A text search looks through the whole city instead
+ * of the viewport.
  */
 export type ExploreResults = ReturnType<typeof useExplorePlaces>;
 
@@ -90,7 +83,7 @@ export function useExplorePlaces() {
 
   const bbox = viewport ? boundsToBbox(snapBoundsOutward(viewport.bounds)) : undefined;
   const params = buildQuery(filters, activeSearch, bbox);
-  const hasLayers = filters.layers.length > 0;
+  const hasLayers = params.layers !== undefined && params.layers.length > 0;
 
   // «Всё из OpenStreetMap» asks for the base layer at any zoom, like a search or a category does.
   const cityView =
@@ -132,16 +125,21 @@ export function useExplorePlaces() {
     if (!places) return [];
     const visible =
       activeSearch || !bounds ? places : places.filter((place) => boundsContain(bounds, place));
+    // Residents' places first, then imported ones; the nearest first within each.
     return visible
       .map((place) => ({ place, distance: origin ? haversine(origin, place) : 0 }))
-      .sort((a, b) => a.distance - b.distance)
+      .sort(
+        (a, b) =>
+          Number(a.place.external !== null) - Number(b.place.external !== null) ||
+          a.distance - b.distance,
+      )
       .map(({ place, distance }) => ({ place, distanceM: showDistance ? distance : undefined }));
   }, [places, bounds, origin, showDistance, activeSearch]);
 
   return {
     /** All fetched places — pass to `useMapPlaces`. */
     places,
-    /** Visible places sorted by distance — render as the list. */
+    /** Visible places, residents' first, then by distance — render as the list. */
     nearby,
     activeSearch,
     hasLayers,

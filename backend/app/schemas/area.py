@@ -37,6 +37,25 @@ class PersonalInterest(ApiModel):
     topics: list[Topic]
 
 
+class CommunityEventRef(OwnedText):
+    """An upcoming event residents made inside a location: enough to name it and open it.
+    Its title is the event author's text."""
+
+    id: int
+    title: str
+    starts_at: datetime
+
+    @field_serializer("title")
+    def _title(self, value: str, info: SerializationInfo) -> str:
+        return self._shown(value, info)
+
+    @classmethod
+    def of(cls, place_id: int, title: str, starts_at: datetime, author_id: int) -> Self:
+        ref = cls(id=place_id, title=title, starts_at=starts_at)
+        ref._own(author_id)
+        return ref
+
+
 class AreaCard(OwnedText):
     """Title and description are user texts: masked for all but moderators and the author."""
 
@@ -56,6 +75,13 @@ class AreaCard(OwnedText):
     combined_rating: CombinedRating | None
     highlights: list[Highlight]
     events_upcoming: int
+    community_events_upcoming: int
+    """Of `events_upcoming`, those residents made (SPEC §17)."""
+    next_community_event: CommunityEventRef | None
+    """The nearest of them by start."""
+    bare_background: bool
+    """A small imported territory with nothing residents made inside: not drawn on the «Карта»
+    section by default (SPEC §18)."""
     issues_open: int
     external: ExternalSource | None
     personal_interest: PersonalInterest | None

@@ -50,6 +50,7 @@ from app.services import (
     reputation,
     uploads,
 )
+from app.services.quests import lookup as quest_lookup
 from app.services.route_planner import PlannedPath, RoutePlanner
 
 DEFAULT_LIMIT = 50
@@ -94,16 +95,21 @@ def is_public(route: Route) -> bool:
     return route.visibility is RouteVisibility.PUBLIC and route.status in PUBLIC_ROUTE_STATUSES
 
 
+def not_quest() -> ColumnElement[bool]:
+    """Quests are routes underneath (SPEC §27) but never listed or opened as routes."""
+    return ~quest_lookup.is_quest_clause()
+
+
 def listed_clause(viewer: User | None) -> ColumnElement[bool]:
     """Public routes, plus the viewer's own ones in a screening window, which look published to
     them (SPEC §24.1)."""
     public = and_(Route.visibility == RouteVisibility.PUBLIC, Route.status.in_(PUBLIC_ROUTE_STATUSES))
     if viewer is None:
-        return public
+        return and_(public, not_quest())
     own = quiet_holds.own_shown_as(
         AiTarget.ROUTE, Route.id, Route.author_id, viewer.id, PUBLIC_ROUTE_STATUSES
     )
-    return or_(public, own)
+    return and_(or_(public, own), not_quest())
 
 
 async def _hold_statuses(
@@ -147,17 +153,23 @@ async def get_route(session: AsyncSession, route_id: int) -> Route:
     return route
 
 
-async def get_visible_route(session: AsyncSession, route_id: int, viewer: User | None) -> Route:
+async def get_visible_route(
+    session: AsyncSession, route_id: int, viewer: User | None, *, quest_ok: bool = False
+) -> Route:
+    """A quest is found only by callers that ask for it (`quest_ok`): its reviews and
+    complaints; every route endpoint answers 404 for it (SPEC §27)."""
     route = await get_route(session, route_id)
-    if not can_view(route, viewer):
+    if not can_view(route, viewer) or (not quest_ok and await quest_lookup.is_quest(session, route.id)):
         raise NotFoundError(_ROUTE_NOT_FOUND)
     return route
 
 
-async def get_public_route(session: AsyncSession, route_id: int, viewer: User | None) -> Route:
+async def get_public_route(
+    session: AsyncSession, route_id: int, viewer: User | None, *, quest_ok: bool = False
+) -> Route:
     """For saving, reviewing and complaining, which only make sense on public routes. A route in
     its screening window answers its author as if it were published."""
-    route = await get_visible_route(session, route_id, viewer)
+    route = await get_visible_route(session, route_id, viewer, quest_ok=quest_ok)
     seen = route.status
     if viewer is not None and viewer.id == route.author_id:
         seen = (await shown_statuses(session, [route])).get(route.id, route.status)
@@ -209,7 +221,7 @@ async def list_routes(session: AsyncSession, viewer: User | None, filters: Route
 async def list_my_routes(session: AsyncSession, user: User) -> list[RouteCard]:
     rows = await session.scalars(
         select(Route)
-        .where(Route.author_id == user.id)
+        .where(Route.author_id == user.id, not_quest())
         .options(*_ROUTE_LOAD)
         .order_by(Route.created_at.desc(), Route.id.desc())
     )

@@ -70,6 +70,8 @@ export const HELD_KIND_LABELS: Record<HeldKind, string> = {
   comment: 'Комментарий',
   review: 'Отзыв',
   note: 'Заметка',
+  lost_item: 'Потеряшка',
+  lost_response: 'Отклик в «Потеряшках»',
 };
 
 /** Hidden author standing (SPEC §24.4): below this every doubt holds. */

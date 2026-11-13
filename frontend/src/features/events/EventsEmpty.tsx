@@ -61,26 +61,6 @@ export function EventsEmpty({ activeSearch }: { activeSearch: string }) {
       />
     );
   }
-  if (filters.kind === 'meetups') {
-    return (
-      <EmptyState
-        icon={Users}
-        title={period ? `Встреч ${period} нет` : 'Встреч пока нет'}
-        description="Позовите соседей поиграть, погулять или навести порядок во дворе — это пара минут."
-        action={
-          period ? (
-            <Button variant="secondary" size="sm" onClick={() => filters.setTime('any')}>
-              Встречи на все даты
-            </Button>
-          ) : (
-            <Button size="sm" icon={Users} onClick={() => startCreateEvent(true)}>
-              Собрать встречу
-            </Button>
-          )
-        }
-      />
-    );
-  }
   if (filters.free) {
     return (
       <EmptyState
@@ -118,10 +98,10 @@ export function EventsEmpty({ activeSearch }: { activeSearch: string }) {
             ? `Жители ${period} ничего не запланировали`
             : 'Жители пока ничего не запланировали'
         }
-        description="Позовите людей сами: забег с собаками, игра во дворе, прогулка, субботник — это пара минут."
+        description="Позовите людей сами: игра во дворе, прогулка, раздача ненужных вещей — или попросите соседей о помощи. Это пара минут."
         action={
           <div className="flex flex-wrap justify-center gap-2">
-            <Button size="sm" icon={Users} onClick={() => startCreateEvent(true)}>
+            <Button size="sm" icon={Users} onClick={() => startCreateEvent('meetup')}>
               Собрать встречу
             </Button>
             <Button variant="secondary" size="sm" onClick={() => filters.setOrigin('all')}>
@@ -144,7 +124,7 @@ export function EventsEmpty({ activeSearch }: { activeSearch: string }) {
               Сбросить фильтры
             </Button>
           )}
-          <Button size="sm" icon={CalendarPlus} onClick={() => startCreateEvent(false)}>
+          <Button size="sm" icon={CalendarPlus} onClick={() => startCreateEvent('event')}>
             Создать событие
           </Button>
         </div>

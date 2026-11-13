@@ -23,13 +23,18 @@ Everything on the map is a **Place** (one table, one card, one verification mech
 optional 1:1 extensions: `EventDetails` (layer `event`) and `IssueDetails` (layer `issue`).
 **Routes** are a separate entity: an ordered list of places.
 
+The «Карта» section draws and lists the place layers only (`infrastructure`, `tourism`): events
+live in «События», issues and outages in their own section. Its layer toggles, filters, search
+and «Для вас» never show an event or an issue; one opened by a link (`/?place=<id>`) is still
+drawn as the selected place. Creating any layer from the map works as before.
+
 In scope: map with filters, adding places, collective verification, reviews, comments,
 complaints, events with join/leave, issues lifecycle, route builder (routing on OpenStreetMap data), favorites
 and collections, reputation / levels / respects / cold mode, automatic + manual moderation with
 audit log and appeals, in-app notifications, territory subscriptions, city statistics.
 
 Out of scope (documented as future work): e-mail confirmation (no SMTP), communities/clubs,
-lost & found, municipal integrations, push notifications, historical map mode.
+municipal integrations, push notifications, historical map mode. (Lost & found, once listed here, is §26.)
 
 ## 2. Roles and levels
 
@@ -137,6 +142,26 @@ For layer `issue`: `present` = «проблема есть», `absent` = «ус�
 `expected_fix_at`, `appeal_number`, `responsible_org`) which switches `source` to `official`.
 Utility outages may have `radius_m` — the affected area drawn as a circle.
 
+**«Проблемы» section** (`/problems`, in place of the former «Отключения»; `/outages` redirects
+there with outages selected and its parameters kept). One switch at the top, in the URL as
+`?show=`:
+
+- «Все» (default, no parameter) — a short outages summary (how many addresses are without what,
+  tap → «Отключения»), then residents' problems. The two kinds never share one list.
+- «От жителей» (`show=residents`) — `issue` places without an import source in the visible
+  part of the map (`GET /places?layers=issue&origin=community&include_resolved=true&bbox=…`):
+  category, stage, «сообщили / подтвердили … назад», trust badge; open ones first and the
+  freshest first (latest of `created_at` / `last_confirmed_at`), solved ones at the end.
+  Filters (category — server side; stage — client side) are folded by default. A row opens the
+  usual card. Empty view → an invitation to report a problem.
+- «Отключения» (`show=outages`) — the outages view of §15.
+
+The section draws its own map marks, according to the switch: residents' problems as clustered
+`issue` pins, outages as pins plus house dots (§15). The main map draws neither. «Сообщить о
+проблеме» starts the place wizard with layer `issue` preset; a published problem opens in
+«Проблемы» (`/problems?place=<id>`) wherever it was created. A direct `/?place=<id>` still opens
+the card.
+
 ### 3.4 Events
 
 `phase` is computed, never stored:
@@ -155,6 +180,43 @@ Meetups (`is_meetup=true`) are small user gatherings with `capacity`; organizer'
 visible only to participants. Joining is impossible when phase is `closed | finished |
 cancelled`. Changing time or cancelling notifies all participants. Recurring events: creating
 with `repeat` produces a series of independent places sharing `series_id`.
+
+**Resident formats** (since 2026-11-13). What residents arrange themselves is the focus of
+«События»; three formats sit on top of the ordinary event and place, as categories — no columns of
+their own (rules in `app/domain/event_formats.py`):
+
+- **«Раздача и барахолка»** (`swap`, layer `event`): someone gives things away and those who sign
+  up may bring their own. Fields `offer` (text «Что отдают») and `bring_own` (boolean «Можно
+  принести своё», «да» by default in the form). Always free (`price` = 0) and always a meetup — the
+  organiser's contact is seen only by those who signed up — whatever is sent, on create and on edit;
+  the form does not ask either. Joining
+  may carry a note «Что принесёте?» (`PUT …/participation` with `{note}`, ≤ 300 characters): it is
+  posted as a comment «Принесу: …» in the event's discussion, so it is checked and screened like any
+  comment (§6, §24.1; it shares the comments' hourly limit); a participant can send more later, the
+  same words twice are not repeated. The card lists «Что принесут участники» — the «Принесу: …»
+  comments of **current** participants the viewer may see (a held one only to its author); leaving
+  takes a person's things off the list, their comments stay. A note is refused (422 on `note`) for
+  other categories and when the organiser answered `bring_own` = «нет».
+- **«Нужна помощь»** (`help`, layer `event`): a small request («Перенести диван на третий этаж») with
+  a time, a place, a description and an optional number of helpers (`capacity`). Always a meetup —
+  the author's contact is seen only by those who responded — and always free. The card and buttons
+  speak about responding: «Помогу», «Вы откликнулись», «Откликнулись: 2», «Нужно ещё 2 помощника»,
+  «Помощники нашлись»; refusals read «Помощников уже достаточно — спасибо!», «Автор закрыл
+  отклики». It finishes like any event when its time passes.
+- **«Площадка для встреч»** (`venue`, layer `infrastructure`, group «Общественные»): premises an owner
+  offers for meetups. Fields `activities` (text «Что можно провести»), `capacity` (number «Вмещает»,
+  чел.), `free`, `price` (₽ в час; not asked when free), `booking` (text «Как договориться» — the
+  owner's own contact, which the screening does not treat as personal data, §24), `hours`,
+  `accessible`. Its card leads with these terms and «Провести здесь встречу», which opens the create
+  flow for a meetup at this venue (`venue_place_id`). The «где» step of a new event offers the
+  venues within about 5 km of the pin, nearest first («Площадки рядом»).
+
+The create control of «События» is one button «Создать» with the choices «Встреча», «Раздача»,
+«Нужна помощь», «Событие побольше» and «Предложить площадку»; a choice skips the steps it answers
+(layer, category). `is_meetup` is not a notion people see as such: «Я пойду» exists on every
+event, so there is no «с записью» filter or badge. The form switch says what the flag changes —
+«Контакт только для участников»: the organiser's contact is seen only by those who tapped «Я пойду»,
+and lists show how many seats are left. The API's `meetups` filter stays.
 
 ## 4. Reputation
 
@@ -235,7 +297,8 @@ Authors of `hidden`/`archived`(rejected) publications can file one **appeal** pe
 In-app only. Kinds: `event_joined` (to organizer), `event_changed`, `event_cancelled` (to
 participants), `comment` (to author), `respect`, `moderation` (decision on own content),
 `place_verified`, `level_up`, `issue_update` (stage change, to author and voters), `territory`
-(new published place inside a subscribed circle).
+(new published place inside a subscribed circle), `lost_found` (§26: a response to one's post, its
+answer, a new post that is very likely the same thing).
 
 ## 9. Catalog (seeded, extensible)
 
@@ -248,9 +311,9 @@ Seed slugs (frontend maps slug → icon/color, unknown slugs fall back to the la
 - **infrastructure** — «Санитарно-бытовые»: `toilet`, `shower`, `baby_room`, `drinking_water`;
   «Медицина»: `first_aid`, `defibrillator`, `first_aid_kit`;
   «Доступная среда»: `ramp`, `elevator`, `accessible_crossing`, `accessible_parking`, `accessible_entrance`;
-  «Общественные»: `public_space`, `rest_place`, `charging`, `wifi`, `library`;
+  «Общественные»: `public_space`, `rest_place`, `charging`, `wifi`, `library`, `venue` (§3.4);
   «Спорт и отдых»: `sports_ground`, `basketball`, `football`, `skatepark`, `workout`, `table_tennis`.
-- **event** — `culture`, `city`, `sport`, `education`, `entertainment`.
+- **event** — `culture`, `city`, `sport`, `education`, `entertainment`, `swap`, `help` (§3.4).
 - **tourism** — `historic`, `architecture`, `food`, `nature`, `viewpoint`, `unusual`, `culture_space`.
 - **issue** — `utilities`, `roads`, `improvement`, `hazard`, `public_space_issue`.
 
@@ -262,6 +325,10 @@ Sport categories → `lighting`, `surface`, `free`. `food` → `avg_check`, `cui
 `nature`/`viewpoint` → `difficulty` (select easy/medium/hard), `parking` (boolean).
 Wherever it makes sense include `free`, `accessible`, `hours` with exactly these keys so the
 «бесплатно» / «доступная среда» quick filters work across categories.
+
+The catalogue in `app/seed/catalog.py` reaches existing databases too: at every start-up (after the
+seed) categories it lacks are added and the group, name, icon and fields of the others refreshed.
+Nothing is deleted, a category never changes its layer, and an empty catalogue is left to the seed.
 
 ## 10. Seed data
 
@@ -357,6 +424,7 @@ linked to a map place. `via` waypoints are invisible shaping points for trails.
   route) that also saves to PDF, and «сохранить себе» (favorites).
 - «Пройти маршрут» mode on the phone: current stop, landmark to the next one, distance to it
   from the user's geolocation, progress.
+- Quests (§27) live in the same section behind the switch «Маршруты | Квесты».
 
 ## 13. Tap anywhere: the "spot" sheet and notes
 
@@ -465,9 +533,11 @@ user «Отключения VL.ru» (`off@mayak-vl.ru`, cannot log in):
   rules as §11: pure parsers tested on saved fixtures, never blocks or crashes the app,
   disabled in tests, HTML treated as untrusted data.
 
-UI: an «Отключения» section — totals by resource, «проверить адрес» search, list of outages
+UI: «Отключения» inside the «Проблемы» section (§3.3, `/problems?show=outages`; the old
+`/outages` redirects there) — totals by resource, «проверить адрес» search, list of outages
 (most houses first) → the usual issue card with the house list grouped by street; house dots
-on the map at high zoom (colour by resource, one dot per house even with several outages); the
+on the map at high zoom (colour by resource, one dot per house even with several outages),
+shown only while the section is open; «Все» of that section shows the totals in one line. The
 spot sheet (§13) tells if the tapped house currently has an outage.
 
 ## 16. Home area and local knowledge (internal trust signal)
@@ -597,11 +667,23 @@ belong to it and are browsed inside its card.
   zooms in (≈ zoom ≥ 15.5) or opens the area — then they appear together with the territory
   polygon (soft tinted fill + outline; all visible territories are faintly tinted from zoom ≈ 14). Tapping a 2GIS object that is linked to an area opens the area, not the spot sheet.
 - Area card (`/?area=<id>`): cover mosaic, name, kind, interest meter + label, count, rating,
-  "что здесь есть" (places grouped by layer/category → open the place card), upcoming events
-  here, open problems here, notes of the linked object, «Добавить место сюда». A place card
-  shows a breadcrumb chip back to its area.
-- Lists (explore, search): areas come first as richer cards; their inner places are not
-  repeated in the list while folded.
+  «Скоро здесь» (upcoming events inside: residents' first, the soonest first, then the afisha's —
+  beyond four rows folded under «ещё N из афиши»), "что здесь есть" (places grouped by
+  layer/category → open the place card), «Проблемы здесь» (open problems, calm), notes of the
+  linked object, «Добавить место сюда». Events and problems are text in the card only, never pins
+  on «Карта»: an event row opens it in «События» (`/events?place=<id>`), a problem row in
+  «Проблемы» (`/problems?place=<id>`). A place card shows a breadcrumb chip back to its area.
+- **Residents' events inside** — what residents make is the heart of the map: an event created
+  by a resident (no external source, not a system author) that is public, not finished and not
+  cancelled makes its location come alive. Cards carry `community_events_upcoming` and the
+  nearest of them, `next_community_event` (id, title, start), computed on read (nothing is stored
+  on the area). The list item shows it as one tappable line «Скоро здесь: Забег с собаками · сб,
+  12:00» (+ «ещё N»; «Сейчас здесь» once it has started) that opens the event in «События»; the
+  card lists it first in «Скоро здесь». It also makes the location recommended (§23.5).
+- Lists (explore, search): areas come first as richer cards — those with a residents' upcoming
+  event inside on top (the sooner first), then the rest by interest; their inner places are not
+  repeated in the list while folded. The places follow, residents' ones before imported ones,
+  the nearest first within each group (subtitle «сначала от жителей, ближние выше»).
 
 Seed: ≥ 15 real areas (Нагорный парк, Спортивная набережная, набережная Цесаревича,
 Покровский парк, Адмиральский сквер, площадь Борцов Революции, Миллионка, сопка Орлиное
@@ -652,10 +734,18 @@ exactly what newcomers in cold mode are allowed to do.
   themselves: a title that is just the category («Детская площадка», «Спортивная площадка»:
   about 2 700 yard playgrounds and grounds), or a sight (layer `tourism`) with no photo — a lone
   monument, plaque or fountain. They are kept and counted but not drawn on the «Карта» section
-  by default. They appear when asked for: their category is chosen, a search matches, or the
+  by default — like everything imported they come after residents' places in its list (§17).
+  They appear when asked for: their category is chosen, a search matches, or the
   «Всё из OpenStreetMap» filter is on. A photo (residents', archive or borrowed from a map
   service) or one confirmation by a resident makes such an object an ordinary place. Named
   infrastructure from OSM (toilets, drinking water, libraries) stays visible.
+- **Bare background territories** — the same rule for areas: an imported territory with at most
+  three places and nothing residents made inside (no residents' place, no residents' upcoming
+  event) is `bare_background` (computed on read). It is neither listed nor drawn (pill,
+  polygon) on «Карта» by default and comes back with «Всё из OpenStreetMap» or a search; a
+  direct link `/?area=<id>` still opens its card, and «Для вас» may still recommend it — only
+  with the much stronger match bare objects need (§23.5), exactly as for bare places. The first
+  place or upcoming event a resident adds inside makes it an ordinary location again.
 
 ## 19. Enrichment from other catalogues — what is allowed and what is not
 
@@ -1081,26 +1171,50 @@ period):
 ```
 quality = interest / 100 for an area;
           0.5·trust_score/100 + 0.5·(rating − 1)/4 for a place (trust alone when unrated);
-          1.0 for an event of a trusted source or a verified one, 0.7 otherwise
-score   = match · (0.6 + 0.4 · quality)
+          1.0 for an event of a trusted source or a verified one, 0.7 otherwise;
+          1.0 for an area or a place raised by a residents' event (below)
+weight  = 1 for what residents made, 0.5 for imported objects
+score   = match · (0.6 + 0.4 · quality) · weight
 ```
 
+- **Residents lead.** «Народное» — made by a resident: no external source and not a system author
+  (the VL.ru, OpenStreetMap and Wikivoyage importers) — comes first. The weight 0.5 is below the
+  quality floor 0.6, so at equal match a residents' object of the lowest quality beats an
+  imported one of the highest; an imported object overtakes it only with at least 1.2× the match
+  (about 1.5× at ordinary qualities). A multiplier rather than a separate tier: a strongly fitting
+  museum from a catalogue can still come before a resident's place that barely fits.
+- **Bare objects need a clearly stronger match**: an imported place or event with nothing to show
+  (no description, no photo, no usefulness ≥ 50) and a location with nothing residents made
+  inside (no residents' place, no residents' upcoming event) are recommended only from
+  `match ≥ 0.65` — in practice two of the person's topics; everything else from `match ≥ 0.15`.
+  A big or well-rated square stays out until residents make something there.
+- **Residents' events raise their hosts.** A residents' upcoming event that fits the person
+  (`match ≥ 0.15`) makes the location it is inside — and a sight that is its venue
+  (`venue_place_id`) — recommended for it: `match = max(own, event's)`, quality 1.0, the reason
+  topics of the event, and the event itself in `reason_event` (the UI names it: «Скоро здесь: …»).
+  Any square can lead the list when a niche residents' event happens in it. The person's own
+  events are not a reason.
 - Quality only nudges: a little-known courtyard with a history beats a famous square for a
   history lover — niche objects are the point. Candidates must be public (`unverified` …
   `verified`; never `needs_review`, `hidden`, `pending`), not the person's own, not already in
   their favourites; events must not be finished, cancelled, full or already joined.
 - Order by `score` (equal events: the sooner first); at most three results share the same
-  leading topic, so the top of the list is not one theme; when that leaves room (a person with
-  one or two interests), the passed-over results follow in score order. `match < 0.15` is not
-  recommended at all.
+  leading topic, so the top of the list is not one theme, and at most two locations of one kind
+  (park, embankment …) lead. When that leaves room (a person with one or two interests), the
+  passed-over results follow in score order — those of a full topic first, the locations of a
+  full kind last.
 - One result per title: a recurring event appears once (its nearest date), a museum mapped twice
   once, and a place named exactly like a recommended location gives way to the location.
-- **Discoveries**: every third result is the best-matching place nobody has rated yet — the
-  quality term pulls the well-known to the top, and this is how a niche object that fits is seen
-  at all. Equally matching discoveries take turns from day to day; they obey the same cap per
-  leading topic. Areas and events are never discoveries.
+- **Discoveries**: every second result (the first at position 2) is the best-matching
+  little-rated place (two ratings at most) — the quality term pulls the well-known to the top,
+  and this is how a niche object that fits is seen at all. Residents' discoveries come before
+  imported ones, and an imported discovery never takes the place of a residents' result. Equally
+  matching discoveries take turns from day to day; they obey the same caps and keep their places
+  when the list runs on passed-over results. Areas and events are never discoveries.
 - Without a profile the answer is `personalized: false` with no items — the UI then offers to
   pick interests instead of pretending.
+- Weights, scores, the usefulness and the author standing are never shown; `score` in the answer
+  is for ordering only.
 - **Map**: the recommended objects lead the one list of the explore panel (up to five, each row
   marked «для вас», no repeats further down), are drawn on the map with a distinct accent and stay
   visible when zoomed out, even when they are small places normally folded into an area.
@@ -1255,6 +1369,10 @@ changes vote weights, reputation, levels or limits. Visible to moderators in the
   original; moderators get the original.
 - The model is told that swearing by itself is acceptable and masked on display; insults and
   hatred aimed at people or groups are still `offensive`.
+- The model is also told about the resident formats (§3.4): the author's own contact given so that
+  people can arrange something — a meetup's organiser, a neighbour asking for help, a venue's owner
+  with its price and booking — is neither `personal_data` nor `ads`; `personal_data` is about
+  exposing other people. Measured on the labelled set (21 of 21 places, `tests/fixtures/screening`).
 
 ## 25. Covers — the photo that makes the best preview
 
@@ -1305,3 +1423,196 @@ picture — sharpness 0.35 · exposure 0.25 · contrast 0.15 · colour 0.15 · p
   keeps them. The reverse is fine: a location may show the photos of its places.
 - Route covers and collection covers read the stored place covers and do not borrow.
 
+## 26. «Потеряшки» — lost and found things
+
+A separate tab where residents post things they found or lost, with the place on the map; whoever
+lost something says what, where and when, and the app picks what fits. It is not a chat: the two
+people exchange contacts once, privately, and arrange the rest themselves.
+
+### 26.1 Posts
+
+- Two kinds: «Нашёл» (`found`) and «Потерял» (`lost`). Fields: category (документы, ключи, телефон и
+  техника, кошелёк и карты, сумка или рюкзак, одежда, украшения и часы, животное, другое), a short
+  title (3–120), a description (≤ 1000), up to 3 own photos, a point on the map (the pick-a-point pin
+  of the place editor), the day it happened (not in the future, not older than 90 days).
+- A lost post says how sure the owner is about the place: 300 m, 1 km, 3 km or «не знаю где» (the
+  whole city). A found post may carry a control question («Что на брелоке?») that a claimant answers
+  in their response; the finder judges the answer, nothing is checked automatically.
+- State, computed on read (no background job): `active`; `returned` — «Вернули хозяину», closed by
+  the author; `expired` — 30 days after creation. Lists, the map and the matcher take active posts
+  only; a returned or expired post stays reachable by its link.
+- Anyone may read; publishing, responding and reporting need an account. Limits: 5 posts and 10
+  responses a day; one response per person and post; the author cannot respond to their own post.
+- In the «документы» category the form warns: write only the first name and the first letter of the
+  surname, publish no numbers and no photo of the spread.
+- Editing is not offered: a post is short-lived; the author deletes it and posts again.
+
+### 26.2 Screening and moderation
+
+Posts, their photos and responses go through the screening of §24 like notes: the author sees a post
+at once, everyone else once the check passes; a held post or response is the author's alone
+(«На проверке — пока видите только вы»), the author is told why, and it waits in the moderators' list
+of held items (`lost_item`, `lost_response`) with release / remove. Photos of a post are screened with
+it: a photo that does not pass holds the post. Moderators' own posts are not screened.
+
+The model gets lost-and-found prompts of its own, so the measured prompts of places stay unchanged:
+
+- a post is public, so personal data in it is held as `personal_data` / `violation`: document numbers,
+  a bank card number, a full name together with a date of birth, a home address or a phone of anyone;
+  «паспорт на имя Ивана С.» is fine;
+- a photo shows a thing, not a place, so `not_a_place` is never used; a readable document page or
+  spread, a readable card number, a full name with a birth date are `personal_data` / `violation`;
+  a passport's cover is fine;
+- a response is private (only the post's author reads it), so details that prove ownership are not
+  personal data there; it is judged for spam, ads, fraud, insults, danger and nonsense. The contact
+  line is never sent to the model, and neither are places, dates or anything about the authors.
+
+Three distinct reports hide a post (like notes, §13); a moderator can hide a post or put it back from
+its page. Complaints of §5 are not used: they are built around places and routes.
+
+### 26.3 Matching
+
+When a lost post is filed (already while it is being filled in) and on its page, the author and
+everyone else see «Похожие находки»; on a found post its author sees «Возможно, это ищут». Two steps:
+
+1. **Rules** (pure, `domain/lost_found.py`) pick the shortlist from active public posts of the other
+   kind by other people. A pair is ruled out when the categories differ (unless the words clearly name
+   the same thing; «другое» needs a shared word), when the found point is farther than twice the
+   owner's radius, or when the thing was found more than a day before it was lost. Otherwise the score
+   weighs the category (0.3), the distance against the radius (0.25), the dates (0.15) and the words
+   of the titles and descriptions (0.3). Words are compared by a crude Russian stem — the longest
+   known ending cut, the first five letters kept — so «кошелёк чёрный» meets «чёрный кошелек»;
+   colours count only as a hint (a shared colour does not make «чёрная сумка» a «чёрный кошелёк»).
+   Pairs scoring at least 0.45 are shortlisted.
+2. **The model** (the screening's OpenRouter client, when configured) judges the shortlisted pairs of
+   a new post in one background request: `same` · `maybe` · `different`, from the categories, titles
+   and descriptions only. It is how «портмоне тёмное» meets «чёрный кошелёк». The verdict is stored
+   in `lost_matches`, so a pair is judged once; `same` lifts a pair up, `different` drops it unless the
+   rules alone are very sure. A pair left without an answer after two requests is decided by the rules.
+
+People see matches in order with a plain reason line («Та же категория, 200 м от места, на
+следующий день, похоже по описанию»), never a score.
+
+**Telling the other side.** A job runs for each new post once it passes screening (it waits for that);
+a sweep a little after start-up and every five minutes catches posts released by a moderator or left
+by a restart. Each pair belongs to its newer post: when it is strong — the model says `same`, or,
+without a judgement, the rules score at least 0.8 — the author of the older post gets one
+`lost_found` notification («Возможно, вашу вещь нашли» / «Возможно, «…» ищут»), once per pair.
+
+**Search without publishing.** «Что потеряли, где, когда» on the tab is a filter over active found
+posts that needs no account and stores nothing: words, a category (or the one the words name —
+«кошелёк» means кошелёк и карты), a circle around the map centre (300 m · 1 km · 3 km) and a day.
+Without a category the words must meet.
+
+### 26.4 Responses and contacts
+
+On another person's post a logged-in user taps «Это моё» (found) or «Я нашёл это» (lost) and sends
+one response: a message (with the answer to the control question) and a contact line (phone,
+Telegram — free text). Only the post's author and the responder ever get the response. The author
+sees the message but not the contact, and accepts — giving their own contact line — or declines;
+once accepted, the two see each other's contacts and nobody else does. Notifications (`lost_found`):
+to the author when a response passes screening, to the responder when it is accepted or declined.
+No public response of the API carries a contact (a test walks the public JSON of every lost-and-found
+endpoint as an anonymous visitor, a stranger and a moderator).
+
+### 26.5 Map
+
+While the tab is open the map shows active posts under the filters (Нашли / Потеряли, category,
+period) as diamonds — green for found, pink for lost — so they never read as place pins or place
+clusters; crowded ones merge into a diamond with a count that zooms in on tap. An opened lost post
+shows its circle. Outside the tab these pins are not drawn.
+
+On phones the tab bar has no room for a sixth tab at 360 px, so «Потеряшки» lives in the account
+menu next to «Проблемы»; on desktop in the lower group of the navigation rail.
+
+### 26.6 Data
+
+New tables only: `lost_items` (the post; `is_hidden` covers screening, reports and moderators,
+`hidden_by_moderator` tells the last apart; `closed_at`), `lost_item_photos` (own uploads attached to
+a post, the photo row itself stays free of any place), `lost_responses` (message, contact, state,
+the author's contact on accept), `lost_matches` (one row per shortlisted pair: verdict, attempts,
+when its authors were told), `lost_item_reports`. Demo posts (8 found, 5 lost in the centre, on the
+embankment, at stops and on the campus, with dates relative to the start-up day) are added once to
+any database, marked in `applied_snapshots` as `lost_found_demo`.
+
+## 27. Quests — riddles around the city, one stage at a time
+
+A quest is a format inside «Маршруты» (switch «Маршруты | Квесты»): a chain of stages where the
+player does not see the next stage until the current one is passed. Each stage is a riddle leading
+to a place; on site the player proves they got there; then the place's story opens and the next
+riddle appears.
+
+**Stage** (author): the place (name and point, optionally a map place), the riddle, an optional
+photo for it, how it is passed, an optional hint, the story told after passing («история места»)
+and what the map shows. How it is passed — one per stage:
+
+- `arrival` — the player's position is within the stage radius (author's choice 20–200 m, default
+  40 m); a reported GPS inaccuracy forgives at most 20 m more;
+- `code` — a code learnt on site (from a person, a shop, a sign);
+- `answer` — an answer to the author's question about the place (several accepted answers).
+
+A `code` or `answer` stage may also require the player to be on site («проверять, что игрок на
+месте»): then a right code from elsewhere is not even looked at. Codes and answers are compared
+after normalisation: case, surrounding and repeated spaces, «ё»/«е», dashes, a closing full stop.
+
+**Search zone**, per stage: only the riddle, or an approximate circle on the map (radius 150–500 m,
+default 250). The circle's centre is moved off the real point by 30–70 % of the radius in a
+direction derived from the stage id, so it is the same on every request, the point is always inside
+it and the centre does not give the place away.
+
+**No leaks.** For players the API never returns the name, point, code, answers, hint (unless taken)
+or story of a stage not yet passed. Of the current stage a player gets only the riddle and its
+photo (in a team: only the member holding it), the kind of check, the question, whether there is a
+hint and the moved circle. Cards, lists, search, results and reviews carry only the start (its
+name and point — public), the number of stages and the estimated duration. Every check happens on
+the server: the client sends its position, the code or the answer and learns only «passed or not»
+— never how far it is. After 5 wrong tries on a stage (a wrong place counts too) the run pauses for
+a minute. The author and moderators see everything.
+
+**Run.** Signed-in players only. A player starts a quest (solo) or a team run; progress is kept on
+the server and resumed from the quest page; one active run per player and quest. The screen:
+«Этап N из M», the riddle, the places already found on the map with their stories, «Подсказка»
+(taking it adds 5 minutes to the result — the player is told before tapping), the finish with the
+time. The author tries an own quest with «Пройти как игрок»: a test run where arrival can be
+confirmed by a button («Я на месте — для проверки»); the author cannot play an own quest for real,
+and test runs count nowhere.
+
+**Teams.** The captain starts a team run with a name and gets a six-character code and a link
+(`/quests/join/<code>`; no 0/O/1/I); up to 8 members join. Progress is shared: a stage passed by
+one member opens for all (clients poll every 4 s). The riddle of each stage is shown to one member
+only — the stage lead, rotating in joining order after every stage; the others see «Загадку ведёт
+<имя>», so the team has to talk. Anyone may send the code, the answer or «Я на месте». The captain
+can hand the riddle to another member; a member who leaves passes the captaincy and the riddle on;
+the last one to leave ends the run. The captain (or a solo player) may stop the run.
+
+**Results board** per quest: the top 10 finished runs — teams and solo — by time from the start to
+the last stage plus 5 minutes per hint taken. Test runs are excluded, and so is a run in which any
+player had already finished the quest before (a replay). «Прошли» on the card counts distinct
+players of finished non-test runs.
+
+**Rules.** A quest is published exactly like a route (§2, §12, §24): it is a `Route` row underneath
+(no stops, never listed or opened by any route endpoint, not counted as a route in profiles and
+statistics), so newcomer probation, the screening window and hold, the author's notice («Квест «…»
+не прошёл автоматическую проверку», linking to the quest), moderation cases and decisions all
+apply. The model reads every stage — riddle, question, answers, hint, story — and every photo (the
+cover and the riddle photos) is checked on its own. A private quest is the author's draft: not
+screened, not listed, playable only as a test. Ratings: only a player who finished the quest
+(not the author) may rate it 1–5 with an optional text — an ordinary route review underneath,
+screened like any review. Complaints use the ordinary mechanism with `target_type = "route"` and
+the quest id.
+
+**Editor** (`/quests/new`, `/quests/:id/edit`): tap the map to place a stage (or, with the «Старт»
+tool, the start), drag pins and rows to reorder, a sheet per stage with all of the above, then the
+quest's title, description, where it starts (public), estimated duration and an optional cover;
+«Черновик» saves it privately, «Опубликовать» publishes. Unsaved work is kept on the device and the
+editor asks before leaving, like the route builder. Validation messages are plain Russian.
+
+**Data**: `quests` (keyed by the route id: start name and point, duration, cover photo),
+`quest_stages` (each with a key that is never reused), `quest_runs` (captain, team name, join
+code, test flag, current lead, hints taken and stages passed — both by stage key, wrong tries and
+pause, ranked, start / finish / abandon times), `quest_run_members`. Runs remember stages by key:
+when the author reorders or rewrites a quest mid-run, a player keeps the stages they passed and is
+never shown one they did not; the editor sends each kept stage's id. **Demo quest** «Тайны старого центра» (author nina): six arrival stages from
+the station to the triumphal arch through Миллионка, riddles and stories taken only from the
+seeded places' own descriptions; added once to any database that has those places, marked in
+`applied_snapshots` as `demo_quest`.

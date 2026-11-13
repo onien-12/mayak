@@ -27,11 +27,12 @@ from app.core.config import Settings
 from app.domain import ai_moderation
 from app.domain.ai_moderation import AiOpinion
 from app.domain.enums import ACTIVE_HOLD_STATES, AiTarget, HoldSource, HoldState, RouteVisibility
-from app.models import Comment, MapNote, Photo, QuietHold, Review
+from app.models import Comment, LostItem, LostResponse, MapNote, Photo, QuietHold, Review
 from app.services import place_queries, quiet_holds, routes
 from app.services.ai_moderation import effects, prompts, subjects
 from app.services.ai_moderation.client import PHOTO_CHECK, TEXT_REVIEW, AiClient, ResponseFormat
 from app.services.ai_moderation.subjects import Subject
+from app.services.quests import lookup as quest_lookup
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +69,8 @@ class _Job:
     has_text: bool
     photos: list[tuple[int, str | None]] = field(default_factory=list)
     """`(photo id, file name in the media directory)`; None for a file that is not ours."""
+    kind: str | None = None
+    """What the item is (`Subject.kind`): lost-and-found posts have prompts of their own."""
 
 
 class AiScreener:
@@ -189,6 +192,7 @@ class AiScreener:
             None if held_by_heuristics else subject,
             has_text=not held_by_heuristics,
             photos=photos,
+            kind=subject.kind,
         )
 
     async def _check(self, job: _Job) -> effects.Checked:
@@ -196,12 +200,15 @@ class AiScreener:
         if job.subject is not None:
             content = prompts.build_text_content(job.subject.kind, job.subject.fields)
             text = await self._ask(
-                prompts.TEXT_SYSTEM_PROMPT, content, TEXT_REVIEW, ai_moderation.parse_text_opinion
+                prompts.text_system_prompt(job.subject.kind),
+                content,
+                TEXT_REVIEW,
+                ai_moderation.parse_text_opinion,
             )
-        photos = [(photo_id, await self._check_photo(name)) for photo_id, name in job.photos]
+        photos = [(photo_id, await self._check_photo(name, job.kind)) for photo_id, name in job.photos]
         return effects.Checked(text_checked=job.has_text, text=text, photos=photos)
 
-    async def _check_photo(self, file_name: str | None) -> AiOpinion | None:
+    async def _check_photo(self, file_name: str | None, kind: str | None = None) -> AiOpinion | None:
         if self._client is None or not self._check_images or file_name is None:
             return None
         image = await asyncio.to_thread(downscale_image, self._media_dir / file_name)
@@ -209,7 +216,7 @@ class AiScreener:
             return None
         content = prompts.build_photo_content(image)
         return await self._ask(
-            prompts.PHOTO_SYSTEM_PROMPT, content, PHOTO_CHECK, ai_moderation.parse_photo_opinion
+            prompts.photo_system_prompt(kind), content, PHOTO_CHECK, ai_moderation.parse_photo_opinion
         )
 
     def _take_quota(self) -> bool:
@@ -263,7 +270,8 @@ async def _route_subject(session: AsyncSession, route_id: int) -> Subject | None
     route = await routes.find_route(session, route_id)
     if route is None or route.visibility is RouteVisibility.PRIVATE:
         return None
-    return subjects.route_subject(route)
+    quest = await quest_lookup.find_quest(session, route_id)
+    return subjects.quest_subject(route, quest) if quest is not None else subjects.route_subject(route)
 
 
 async def _subject(session: AsyncSession, target_type: AiTarget, target_id: int) -> Subject | None:
@@ -276,6 +284,8 @@ async def _subject(session: AsyncSession, target_type: AiTarget, target_id: int)
         AiTarget.NOTE: (MapNote, subjects.note_subject),
         AiTarget.COMMENT: (Comment, subjects.comment_subject),
         AiTarget.REVIEW: (Review, subjects.review_subject),
+        AiTarget.LOST_ITEM: (LostItem, subjects.lost_item_subject),
+        AiTarget.LOST_RESPONSE: (LostResponse, subjects.lost_response_subject),
     }[target_type]
     item = await session.get(model, target_id)
     return describe(item) if item is not None else None

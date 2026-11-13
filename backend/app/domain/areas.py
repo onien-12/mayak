@@ -26,6 +26,7 @@ DUPLICATE_OVERLAP_SHARE = 0.5
 NESTED_AREA_RATIO = 0.25
 COUNTED_LAYERS = frozenset({Layer.INFRASTRUCTURE, Layer.TOURISM})
 """Layers that make a location worth visiting; events add separately, issues never do."""
+BACKGROUND_MAX_PLACES = 3
 
 INTEREST_LABELS: tuple[tuple[int, str], ...] = (
     (25, "Пока мало отмечено"),
@@ -89,3 +90,15 @@ def highlights(places: Sequence[CountedPlace]) -> list[dict[str, int]]:
 def mean_rating(places: Sequence[CountedPlace]) -> float | None:
     ratings = [place.rating_avg for place in places if place.rating_avg is not None]
     return round(sum(ratings) / len(ratings), 2) if ratings else None
+
+
+def is_bare_background(
+    imported: bool, places_count: int, community_places: int, community_events: int
+) -> bool:
+    """A small imported territory nobody has made anything in (SPEC §18): from OpenStreetMap, with
+    at most three places and no residents' place or upcoming event inside. Kept and searchable,
+    but not drawn on the «Карта» section by default — like a bare background place. One place or
+    one upcoming event by a resident brings it back."""
+    return (
+        imported and places_count <= BACKGROUND_MAX_PLACES and community_places == 0 and community_events == 0
+    )

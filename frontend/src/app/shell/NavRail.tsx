@@ -12,8 +12,8 @@ import { Logo } from './Logo';
 import {
   isNavItemActive,
   MODERATION_NAV,
-  OUTAGES_NAV,
   PRIMARY_NAV,
+  PROBLEMS_NAV,
   STATS_NAV,
   type NavItem,
 } from './navigation';
@@ -76,7 +76,7 @@ export function NavRail() {
         ))}
       </div>
       <div className="mt-auto flex w-full flex-col items-center gap-1">
-        <RailLink item={OUTAGES_NAV} />
+        <RailLink item={PROBLEMS_NAV} />
         <RailLink item={STATS_NAV} />
         {isModerator && <RailLink item={MODERATION_NAV} />}
         <span aria-hidden className="my-1.5 h-px w-8 bg-line" />

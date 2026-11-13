@@ -17,6 +17,7 @@ from app.domain.enums import (
 )
 from app.schemas.common import ApiModel
 from app.schemas.place import HistoryEntry, PhotoOut, PlaceDetail
+from app.schemas.quest import QuestEditor
 from app.schemas.route import RouteDetail
 from app.schemas.user import UserBrief
 
@@ -99,6 +100,8 @@ class PhotoReview(ApiModel):
 class ModerationCaseDetail(ModerationCaseOut):
     place: PlaceDetail | None
     route: RouteDetail | None
+    quest: QuestEditor | None = None
+    """Set when the route is a quest (SPEC §27): every stage, as its author sees them."""
     complaints: list[ComplaintItem]
     clarifications: list[ClarificationItem]
     """What residents asked to clarify about the place, newest first; empty for other targets."""

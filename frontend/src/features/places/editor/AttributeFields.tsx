@@ -48,57 +48,94 @@ function YesNo({ label, value, onChange }: YesNoProps) {
   );
 }
 
-/** Optional facts defined by the category `fields` (drives the card and attribute filters). */
-export function AttributeFields({ fields }: { fields: readonly FieldDef[] }) {
+/** Hints for text facts the resident formats ask up front (SPEC §3.4). */
+const PLACEHOLDERS: Record<string, string> = {
+  offer: 'Детские вещи, книги, посуда',
+  bring: 'Перчатки, отвёртку',
+  activities: 'Тренировки, лекции, настолки, клубы',
+  booking: 'Телеграм, телефон или «спросить администратора»',
+  hours: 'Например: будни 10–20',
+};
+
+/**
+ * Facts defined by the category `fields` (drives the card and attribute filters). By default
+ * the yes/no questions come first in one box; `inOrder` keeps the declared order — a format's
+ * own questions read top to bottom (consecutive yes/no ones still share a box).
+ */
+export function AttributeFields({
+  fields,
+  inOrder = false,
+}: {
+  fields: readonly FieldDef[];
+  inOrder?: boolean;
+}) {
   const { control, register } = useFormContext<PlaceFormValues>();
   // «Бесплатно — да» leaves nothing to say about the price: such fields step aside.
   const answers = useWatch({ control, name: 'attributes' });
   const asked = fields.filter((field) => isRelevantFact(field.key, answers));
-  const booleans = asked.filter((field) => field.type === 'boolean');
-  const others = asked.filter((field) => field.type !== 'boolean');
+  const ordered = inOrder
+    ? asked
+    : [
+        ...asked.filter((field) => field.type === 'boolean'),
+        ...asked.filter((field) => field.type !== 'boolean'),
+      ];
+  // Runs of yes/no questions, each rendered as one box; other fields stand alone.
+  const blocks: { key: string; yesNo: boolean; fields: FieldDef[] }[] = [];
+  for (const field of ordered) {
+    const yesNo = field.type === 'boolean';
+    const last = blocks.at(-1);
+    if (yesNo && last?.yesNo) last.fields.push(field);
+    else blocks.push({ key: field.key, yesNo, fields: [field] });
+  }
+
+  const yesNoBox = (key: string, box: FieldDef[]) => (
+    <div key={key} className="divide-y divide-line rounded-card border border-line px-3.5">
+      {box.map((field) => (
+        <Controller
+          key={field.key}
+          control={control}
+          name={`attributes.${field.key}`}
+          render={({ field: input }) => (
+            <YesNo
+              label={field.label}
+              value={typeof input.value === 'boolean' ? input.value : null}
+              onChange={input.onChange}
+            />
+          )}
+        />
+      ))}
+    </div>
+  );
+
+  const single = (field: FieldDef) => {
+    const id = `attr-${field.key}`;
+    const label = field.unit ? `${field.label}, ${field.unit}` : field.label;
+    return (
+      <Field key={field.key} label={label} htmlFor={id}>
+        {field.type === 'select' ? (
+          <Select
+            id={id}
+            placeholder="Не указано"
+            options={field.options ?? []}
+            {...register(`attributes.${field.key}`)}
+          />
+        ) : (
+          <Input
+            id={id}
+            inputMode={field.type === 'number' ? 'decimal' : undefined}
+            placeholder={PLACEHOLDERS[field.key]}
+            {...register(`attributes.${field.key}`)}
+          />
+        )}
+      </Field>
+    );
+  };
 
   return (
     <div className="flex flex-col gap-3">
-      {booleans.length > 0 && (
-        <div className="divide-y divide-line rounded-card border border-line px-3.5">
-          {booleans.map((field) => (
-            <Controller
-              key={field.key}
-              control={control}
-              name={`attributes.${field.key}`}
-              render={({ field: input }) => (
-                <YesNo
-                  label={field.label}
-                  value={typeof input.value === 'boolean' ? input.value : null}
-                  onChange={input.onChange}
-                />
-              )}
-            />
-          ))}
-        </div>
+      {blocks.map((block) =>
+        block.yesNo ? yesNoBox(block.key, block.fields) : block.fields.map(single),
       )}
-      {others.map((field) => {
-        const id = `attr-${field.key}`;
-        const label = field.unit ? `${field.label}, ${field.unit}` : field.label;
-        return (
-          <Field key={field.key} label={label} htmlFor={id}>
-            {field.type === 'select' ? (
-              <Select
-                id={id}
-                placeholder="Не указано"
-                options={field.options ?? []}
-                {...register(`attributes.${field.key}`)}
-              />
-            ) : (
-              <Input
-                id={id}
-                inputMode={field.type === 'number' ? 'decimal' : undefined}
-                {...register(`attributes.${field.key}`)}
-              />
-            )}
-          </Field>
-        );
-      })}
     </div>
   );
 }

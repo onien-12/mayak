@@ -8,6 +8,7 @@ export {
 } from './editor/areaEditorStore';
 export { useCanManageAreas } from './editor/useCanManageAreas';
 export { AreaListItem, AreaThumb } from './list/AreaListItem';
+export { CommunityEventLine } from './list/CommunityEventLine';
 export { CreateAreaHint } from './list/CreateAreaHint';
 export { useMapAreas, useMapRecommendedAreas } from './map/areaLayerStore';
 export { AreaLayer, TERRITORY_TINT_ZOOM } from './map/AreaLayer';

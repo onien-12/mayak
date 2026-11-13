@@ -1,11 +1,14 @@
 """Areas: polygon territories that group the places inside them (SPEC §17)."""
 
 import math
+from datetime import datetime, timedelta
 from typing import Any
 
 from httpx import AsyncClient
+from sqlalchemy import update
 
-from app.domain.enums import UserRole
+from app.domain.enums import ExternalSourceId, UserRole
+from app.models import Area, Place
 from app.services.geometry_lookup import OSM_ATTRIBUTION, GeometryLookup
 from tests.conftest import API, Actor, World
 
@@ -255,6 +258,77 @@ async def test_area_summary_follows_its_places(world: World, client: AsyncClient
     reduced = await summary()
     assert (reduced["places_count"], reduced["events_upcoming"]) == (1, 0)
     assert {place["id"] for place in reduced["places"]} == {viewpoint["id"], issue["id"]}
+
+
+async def test_area_names_the_nearest_residents_event(world: World, client: AsyncClient) -> None:
+    trusted = await world.actor("trusted", reputation=60)
+    organizer = await world.actor("organizer", reputation=20)
+    park = await create_area(trusted)
+
+    async def card() -> dict[str, Any]:
+        detail = (await client.get(f"{API}/areas/{park['id']}")).json()
+        listed = next(item for item in (await client.get(f"{API}/areas")).json() if item["id"] == park["id"])
+        fields = ("community_events_upcoming", "next_community_event")
+        assert {key: listed[key] for key in fields} == {key: detail[key] for key in fields}
+        return detail
+
+    empty = await card()
+    assert (empty["community_events_upcoming"], empty["next_community_event"]) == (0, None)
+
+    later = await world.create_place(organizer, "sport", event=world.event_window(72), **point(40, 40))
+    soon = await world.create_place(
+        organizer, "sport", title="Забег с собаками", event=world.event_window(24), **point(60, 60)
+    )
+    # Another author nearby: the "a few points close together" limit stays out of the way.
+    other = await world.actor("other", reputation=20)
+    imported = await world.create_place(other, "culture", event=world.event_window(12), **point(150, 250))
+    cancelled = await world.create_place(other, "culture", event=world.event_window(6), **point(30, 260))
+    await other.patch(f"/places/{cancelled['id']}", json={"event": {"is_cancelled": True}})
+    async with world.session() as session:
+        await session.execute(
+            update(Place).where(Place.id == imported["id"]).values(external_source=ExternalSourceId.VL_RU)
+        )
+        await session.commit()
+
+    found = await card()
+    assert found["community_events_upcoming"] == 2
+    nearest = found["next_community_event"]
+    assert (nearest["id"], nearest["title"]) == (soon["id"], "Забег с собаками")
+    assert datetime.fromisoformat(nearest["starts_at"]) == datetime.fromisoformat(soon["event"]["starts_at"])
+
+    # Once it is over, the next one is named.
+    world.clock.shift(timedelta(hours=27))
+    after = await card()
+    assert after["community_events_upcoming"] == 1
+    assert after["next_community_event"]["id"] == later["id"]
+
+
+async def test_small_imported_area_is_background_until_residents_add_something(
+    world: World, client: AsyncClient
+) -> None:
+    trusted = await world.actor("trusted", reputation=60)
+    resident = await world.actor("resident", reputation=20)
+    square = await create_area(trusted, title="Сквер Тобольский")
+    async with world.session() as session:
+        await session.execute(
+            update(Area).where(Area.id == square["id"]).values(external_source=ExternalSourceId.OSM)
+        )
+        await session.commit()
+
+    async def bare() -> bool:
+        detail = (await client.get(f"{API}/areas/{square['id']}")).json()
+        listed = (await client.get(f"{API}/areas")).json()[0]
+        assert listed["bare_background"] == detail["bare_background"]
+        return detail["bare_background"]
+
+    assert await bare()
+    # The card still opens by a direct link; one residents' event inside brings the area back.
+    event = await world.create_place(resident, "sport", event=world.event_window(24), **point(50, 50))
+    assert not await bare()
+    await resident.patch(f"/places/{event['id']}", json={"event": {"is_cancelled": True}})
+    assert await bare()
+    await world.create_place(resident, **point(80, 120))
+    assert not await bare()
 
 
 async def test_list_areas(world: World, client: AsyncClient) -> None:

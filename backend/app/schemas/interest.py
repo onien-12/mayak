@@ -3,7 +3,7 @@ from typing import Annotated, Literal
 from pydantic import Field, StringConstraints
 
 from app.domain.interests import Topic
-from app.schemas.area import AreaCard
+from app.schemas.area import AreaCard, CommunityEventRef
 from app.schemas.common import ApiModel
 from app.schemas.place import PlaceCard
 
@@ -37,6 +37,8 @@ class Recommendation(ApiModel):
     topics: list[Topic]
     area: AreaCard | None
     place: PlaceCard | None
+    reason_event: CommunityEventRef | None
+    """A location recommended for the residents' upcoming event inside it (SPEC §23.5)."""
 
 
 class Recommendations(ApiModel):

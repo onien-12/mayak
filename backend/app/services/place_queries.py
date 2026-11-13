@@ -26,6 +26,13 @@ class Origin(StrEnum):
 RESTRICTED_STATUSES = (PlaceStatus.PENDING, PlaceStatus.HIDDEN)
 """Visible only to the author and moderators."""
 
+
+def community_clause() -> ColumnElement[bool]:
+    """Made by a resident: no external source and not a system author (the importers' accounts)."""
+    system_authors = select(User.id).where(User.is_system.is_(True))
+    return Place.external_source.is_(None) & Place.author_id.not_in(system_authors)
+
+
 _PLACE_NOT_FOUND = "Точка не найдена."
 _FULL_LOAD = (
     joinedload(Place.category),

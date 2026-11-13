@@ -11,6 +11,7 @@ import {
   type PlaceUpdate,
   type VoteKind,
 } from '@/shared/api';
+import { eventWording } from '@/shared/lib/eventFormats';
 import { toast } from '@/shared/ui';
 
 const NOT_FOUND = 404;
@@ -37,7 +38,7 @@ interface OptimisticOptions<TInput> {
   mutationFn: (input: TInput) => Promise<PlaceDetail>;
   /** Pure prediction of the server result, applied to the cache immediately. */
   predict: (place: PlaceDetail, input: TInput) => PlaceDetail;
-  onSuccess?: (place: PlaceDetail) => void;
+  onSuccess?: (place: PlaceDetail, input: TInput) => void;
 }
 
 /** Mutation that returns `PlaceDetail`: optimistic cache update, rollback and toast on error. */
@@ -62,9 +63,9 @@ function useOptimisticPlaceMutation<TInput>({
       if (context?.previous) queryClient.setQueryData(key, context.previous);
       toast.error(errorMessage(error));
     },
-    onSuccess: (place) => {
+    onSuccess: (place, input) => {
       syncPlace(queryClient, place);
-      onSuccess?.(place);
+      onSuccess?.(place, input);
     },
   });
 }
@@ -119,8 +120,14 @@ export function useWithdrawVote(placeId: number) {
   });
 }
 
-function predictParticipation(place: PlaceDetail, join: boolean): PlaceDetail {
-  if (!place.event) return place;
+interface ParticipationInput {
+  join: boolean;
+  /** Swap only: what the participant brings; may be sent again by a participant to add more. */
+  note?: string;
+}
+
+function predictParticipation(place: PlaceDetail, { join }: ParticipationInput): PlaceDetail {
+  if (!place.event || place.event.is_joined === join) return place;
   const delta = join ? 1 : -1;
   const { seats_left } = place.event;
   return {
@@ -134,17 +141,22 @@ function predictParticipation(place: PlaceDetail, join: boolean): PlaceDetail {
   };
 }
 
-/** Join (`true`) or leave (`false`) an event. */
+/** Join or leave an event, in the words of its format; a note says what the participant brings. */
 export function useParticipation(placeId: number) {
   const queryClient = useQueryClient();
-  return useOptimisticPlaceMutation<boolean>({
+  return useOptimisticPlaceMutation<ParticipationInput>({
     placeId,
-    mutationFn: (join) => (join ? eventsApi.join(placeId) : eventsApi.leave(placeId)),
+    mutationFn: ({ join, note }) =>
+      join ? eventsApi.join(placeId, note ? { note } : undefined) : eventsApi.leave(placeId),
     predict: predictParticipation,
-    onSuccess: (place) => {
+    onSuccess: (place, { note }) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.places.participants(placeId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.places.contributions(placeId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.places.comments(placeId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.me.events });
-      toast.success(place.event?.is_joined ? 'Вы участвуете!' : 'Вы больше не участвуете');
+      const wording = eventWording(place.category.slug);
+      if (!place.event?.is_joined) toast.success(wording.leftToast);
+      else toast.success(note ? 'Записали, что вы принесёте' : wording.joinedToast);
     },
   });
 }

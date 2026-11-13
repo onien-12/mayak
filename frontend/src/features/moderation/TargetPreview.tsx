@@ -1,7 +1,14 @@
 import { CalendarClock, ExternalLink, Lightbulb, MapPin, MapPinned } from 'lucide-react';
 import { Link, useNavigate } from 'react-router';
 
-import type { AttributeValue, FieldDef, PlaceDetail, RouteDetail } from '@/shared/api';
+import type {
+  AttributeValue,
+  FieldDef,
+  PlaceDetail,
+  QuestEditor,
+  QuestStage,
+  RouteDetail,
+} from '@/shared/api';
 import {
   formatDistance,
   formatDuration,
@@ -163,15 +170,84 @@ function RoutePreview({ route }: { route: RouteDetail }) {
   );
 }
 
+const CONDITION_LABELS: Record<QuestStage['condition'], string> = {
+  arrival: 'прийти на место',
+  code: 'код на месте',
+  answer: 'ответ на вопрос',
+};
+
+function stageCheck(stage: QuestStage): string {
+  const parts = [CONDITION_LABELS[stage.condition]];
+  if (stage.condition === 'code') parts.push(`код «${stage.answers[0] ?? ''}»`);
+  if (stage.condition === 'answer')
+    parts.push(`«${stage.question}» → ${stage.answers.join(' / ')}`);
+  return parts.join(': ');
+}
+
+/** A quest is a route underneath (SPEC §27): every stage is shown here, secrets included. */
+function QuestPreview({ quest }: { quest: QuestEditor }) {
+  const status = ROUTE_STATUS_META[quest.status];
+  return (
+    <CaseSection title="Квест">
+      <div className="flex flex-col gap-3">
+        <div>
+          <p className="text-xs font-medium text-ink-soft">Старт: {quest.start.title}</p>
+          <h3 className="text-lg leading-tight font-semibold text-ink">{quest.title}</h3>
+          <Badge tone={status.tone} icon={status.icon} className="mt-1.5">
+            {status.label}
+          </Badge>
+        </div>
+        {quest.description && (
+          <p className="text-base [overflow-wrap:anywhere] whitespace-pre-line text-ink">
+            {quest.description}
+          </p>
+        )}
+        {quest.cover_photo && <PhotoGrid photos={[quest.cover_photo]} alt="Обложка квеста" />}
+        <ol className="flex flex-col gap-3">
+          {quest.stages.map((stage) => (
+            <li key={stage.id} className="flex gap-2.5 text-sm text-ink">
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-event text-xs font-bold text-white">
+                {stage.position}
+              </span>
+              <span className="flex min-w-0 flex-col gap-1 pt-0.5 [overflow-wrap:anywhere]">
+                <span className="font-medium">{stage.title}</span>
+                <span className="whitespace-pre-line">Загадка: {stage.riddle}</span>
+                <span className="text-ink-soft">Проверка: {stageCheck(stage)}</span>
+                {stage.hint && <span className="text-ink-soft">Подсказка: {stage.hint}</span>}
+                {stage.reward && (
+                  <span className="whitespace-pre-line text-ink-soft">История: {stage.reward}</span>
+                )}
+                {stage.photo && (
+                  <PhotoGrid photos={[stage.photo]} alt={`Фото к этапу ${stage.position}`} />
+                )}
+              </span>
+            </li>
+          ))}
+        </ol>
+        <Link
+          to={`/quests/${quest.id}`}
+          className={buttonClasses({ variant: 'secondary', size: 'sm' })}
+        >
+          <ExternalLink size={16} aria-hidden />
+          Открыть квест
+        </Link>
+      </div>
+    </CaseSection>
+  );
+}
+
 /** The publication under review, with everything needed to judge it. */
 export function TargetPreview({
   place,
   route,
+  quest = null,
 }: {
   place: PlaceDetail | null;
   route: RouteDetail | null;
+  quest?: QuestEditor | null;
 }) {
   if (place) return <PlacePreview place={place} />;
+  if (quest) return <QuestPreview quest={quest} />;
   if (route) return <RoutePreview route={route} />;
   return (
     <CaseSection title="Публикация">

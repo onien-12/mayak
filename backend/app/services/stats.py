@@ -36,6 +36,7 @@ from app.schemas.stats import (
 from app.schemas.user import UserBrief
 from app.services import quiet_holds
 from app.services.mappers import EXTERNAL_SOURCE_LABELS
+from app.services.quests import lookup as quest_lookup
 
 ACTIVITY_DAYS = 30
 TOP_CATEGORIES = 10
@@ -117,7 +118,11 @@ async def _totals(
             session,
             select(func.count())
             .select_from(Route)
-            .where(Route.visibility == RouteVisibility.PUBLIC, Route.status.in_(PUBLIC_ROUTE_STATUSES)),
+            .where(
+                Route.visibility == RouteVisibility.PUBLIC,
+                Route.status.in_(PUBLIC_ROUTE_STATUSES),
+                ~quest_lookup.is_quest_clause(),
+            ),
         ),
         users=await _count(session, select(func.count()).select_from(User).where(User.is_system.is_(False))),
         votes=await _count(session, select(func.count()).select_from(Vote)),

@@ -14,11 +14,13 @@ import {
   type PopoverTriggerProps,
 } from '@/shared/ui';
 
-import { MODERATION_NAV, OUTAGES_NAV, STATS_NAV } from './navigation';
+import { MODERATION_NAV, PROBLEMS_NAV, SAVED_NAV, STATS_NAV, type NavItem } from './navigation';
 
 interface UserMenuProps {
   placement: PopoverPlacement;
-  /** Include the secondary sections (phones, where the tab bar has no room for them). */
+  /**
+   * Phones: «Ещё» — the sections that have no tab come first, the account after them.
+   */
   withSections?: boolean;
   trigger: (props: PopoverTriggerProps, state: { open: boolean }) => ReactNode;
 }
@@ -27,9 +29,30 @@ interface UserMenuProps {
 export function UserMenu({ placement, withSections = false, trigger }: UserMenuProps) {
   const { user, isModerator, logout } = useAuth();
   const navigate = useNavigate();
+  const sections: NavItem[] = [
+    PROBLEMS_NAV,
+    SAVED_NAV,
+    STATS_NAV,
+    ...(isModerator ? [MODERATION_NAV] : []),
+  ];
 
   return (
-    <Dropdown label="Аккаунт" placement={placement} trigger={trigger} className="w-64">
+    <Dropdown
+      label={withSections ? 'Ещё' : 'Аккаунт'}
+      placement={placement}
+      trigger={trigger}
+      className="w-64"
+    >
+      {withSections && (
+        <>
+          {sections.map((item) => (
+            <DropdownItem key={item.to} icon={item.icon} onSelect={() => navigate(item.to)}>
+              {item.label}
+            </DropdownItem>
+          ))}
+          <DropdownSeparator />
+        </>
+      )}
       {user ? (
         <>
           <div className="flex items-center gap-3 px-2.5 py-2">
@@ -57,22 +80,6 @@ export function UserMenu({ placement, withSections = false, trigger }: UserMenuP
           <DropdownItem icon={UserRoundPlus} onSelect={() => openAuthModal('register')}>
             Создать аккаунт
           </DropdownItem>
-        </>
-      )}
-      {withSections && (
-        <>
-          <DropdownSeparator />
-          <DropdownItem icon={OUTAGES_NAV.icon} onSelect={() => navigate(OUTAGES_NAV.to)}>
-            Отключения воды, тепла и света
-          </DropdownItem>
-          <DropdownItem icon={STATS_NAV.icon} onSelect={() => navigate(STATS_NAV.to)}>
-            Статистика города
-          </DropdownItem>
-          {isModerator && (
-            <DropdownItem icon={MODERATION_NAV.icon} onSelect={() => navigate(MODERATION_NAV.to)}>
-              Модерация
-            </DropdownItem>
-          )}
         </>
       )}
       {user && (
