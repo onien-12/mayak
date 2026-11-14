@@ -8,7 +8,7 @@ import { boundsOfPoints } from '@/shared/lib/geo';
 import { SPRING, toast } from '@/shared/ui';
 
 import { DraggableMarker } from '../../map/DraggableMarker';
-import { MAX_STAGES } from './model';
+import { MAX_STAGES, pointOf } from './model';
 import { useQuestEditorStore } from './store';
 
 const PIN = 32;
@@ -33,31 +33,44 @@ function StagePin({ number, active }: { number: number; active: boolean }) {
 }
 
 /**
- * The quest on the author's map: numbered stages in order (dragged to move, tapped to edit), the
- * start flag, and for the stage being edited its arrival radius and search circle. A tap on the
- * map adds a stage there, or moves the start with the «Старт» tool.
+ * The quest on the author's map: numbered stages in order (dragged to move, tapped to open), the
+ * start flag, and for the open stage — highlighted — its arrival radius and search circle. A tap
+ * on the map puts the open stage there while it waits for its point, adds a stage from the
+ * overview, or sets the start with the «Старт» tool.
  */
 export function EditorMapLayer({ interactive }: { interactive: boolean }) {
   const stages = useQuestEditorStore((state) => state.draft.stages);
   const start = useQuestEditorStore((state) => state.draft.start);
-  const editingId = useQuestEditorStore((state) => state.editingId);
+  const currentId = useQuestEditorStore((state) =>
+    state.step === 'stages' && state.view === 'stage' ? state.currentId : null,
+  );
   const { fitBounds, ready } = useMapActions();
   const framed = useRef(false);
-  const editing = stages.find((stage) => stage.id === editingId);
+  const current = stages.find((stage) => stage.id === currentId);
+  const currentPoint = current ? pointOf(current) : null;
 
   useMapTap(
     (tap: MapTap) => {
       if (!interactive) return;
       const store = useQuestEditorStore.getState();
+      const point = { lat: tap.lat, lng: tap.lng };
       if (store.tool === 'start') {
-        store.setMeta({ start: { lat: tap.lat, lng: tap.lng } });
+        store.setMeta({ start: point });
         store.setTool('stage');
-        toast.success('Старт отмечен — теперь ставьте этапы');
+        toast.success('Старт отмечен — его можно перетащить');
         return;
       }
-      if (store.addStage(tap, tap.objectId ?? null) === null) {
-        toast.info(`В квесте может быть до ${MAX_STAGES} этапов`);
+      if (store.step !== 'stages') return;
+      if (store.view === 'overview') {
+        if (store.addStageAt(point, tap.objectId ?? null) === null) {
+          toast.info(`В квесте может быть до ${MAX_STAGES} этапов`);
+        }
+        return;
       }
+      const open = store.draft.stages.find((stage) => stage.id === store.currentId);
+      if (!open) return;
+      if (!pointOf(open)) store.updateStage(open.id, { ...point, objectId: tap.objectId ?? null });
+      else if (store.replacing) store.updateStage(open.id, point);
     },
     true,
     { capture: true },
@@ -66,21 +79,26 @@ export function EditorMapLayer({ interactive }: { interactive: boolean }) {
   useEffect(() => {
     if (framed.current || !ready) return;
     framed.current = true;
-    const bounds = boundsOfPoints([...(start ? [start] : []), ...stages]);
-    if (bounds && stages.length > 0) fitBounds(bounds, { maxZoom: 16 });
+    const placed = stages.flatMap((stage) => pointOf(stage) ?? []);
+    const bounds = boundsOfPoints([...(start ? [start] : []), ...placed]);
+    if (bounds && placed.length > 0) fitBounds(bounds, { maxZoom: 16 });
   }, [ready, stages, start, fitBounds]);
 
-  const { updateStage, openEditor, setMeta } = useQuestEditorStore.getState();
-  const path = stages.map((stage) => [stage.lng, stage.lat] as [number, number]);
+  const { updateStage, openStage, setMeta } = useQuestEditorStore.getState();
+  const placedStages = stages.flatMap((stage, index) => {
+    const point = pointOf(stage);
+    return point ? [{ stage, point, number: index + 1 }] : [];
+  });
+  const path = placedStages.map(({ point }) => [point.lng, point.lat] as [number, number]);
 
   return (
     <>
       {path.length > 1 && <MapRoute path={path} color={STAGE_COLOR} fit={false} />}
-      {editing && (
+      {current && currentPoint && (
         <>
-          <MapCircle center={editing} radiusM={editing.radiusM} color={STAGE_COLOR} />
-          {editing.zone === 'circle' && (
-            <MapCircle center={editing} radiusM={editing.zoneRadiusM} color={ZONE_COLOR} />
+          <MapCircle center={currentPoint} radiusM={current.radiusM} color={STAGE_COLOR} />
+          {current.zone === 'circle' && (
+            <MapCircle center={currentPoint} radiusM={current.zoneRadiusM} color={ZONE_COLOR} />
           )}
         </>
       )}
@@ -101,17 +119,17 @@ export function EditorMapLayer({ interactive }: { interactive: boolean }) {
           </span>
         </DraggableMarker>
       )}
-      {stages.map((stage, index) => (
+      {placedStages.map(({ stage, point, number }) => (
         <DraggableMarker
           key={stage.id}
-          position={stage}
+          position={point}
           anchor={[PIN / 2, PIN / 2]}
-          zIndex={stage.id === editingId ? 46 : 36}
-          label={`Этап ${index + 1}: перетащите или нажмите, чтобы описать`}
-          onTap={() => openEditor(stage.id)}
-          onDragEnd={(point) => updateStage(stage.id, point)}
+          zIndex={stage.id === currentId ? 46 : 36}
+          label={`Этап ${number}: перетащите или нажмите, чтобы открыть`}
+          onTap={() => openStage(stage.id)}
+          onDragEnd={(moved) => updateStage(stage.id, moved)}
         >
-          <StagePin number={index + 1} active={stage.id === editingId} />
+          <StagePin number={number} active={stage.id === currentId} />
         </DraggableMarker>
       ))}
     </>

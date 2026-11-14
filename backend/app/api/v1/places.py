@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query, status
 
@@ -6,7 +6,7 @@ from app.api.v1 import params
 from app.core.deps import CurrentUser, Moderator, OptionalUser, SessionDep
 from app.core.errors import FieldValidationError
 from app.core.rate_limit import limit_by_user
-from app.domain import attributes, limits
+from app.domain import attributes, limits, map_list
 from app.domain.enums import AiTarget, Layer
 from app.schemas.common import UtcDatetime
 from app.schemas.feedback import CommentIn, CommentOut, ReviewIn, ReviewOut
@@ -19,10 +19,20 @@ from app.schemas.place import (
     PlaceCard,
     PlaceDetail,
     PlaceInput,
+    PlacePage,
     PlaceUpdate,
     VoteIn,
 )
-from app.services import comments, favorites, issues, moderation, places, reviews, verification
+from app.services import (
+    comments,
+    favorites,
+    issues,
+    moderation,
+    place_list,
+    places,
+    reviews,
+    verification,
+)
 from app.services.ai_moderation.screener import AiScreener, get_ai_screener
 from app.services.external_ratings import RatingRefresher, get_rating_refresher
 from app.services.places import MinStatus, Origin, PlaceFilters
@@ -98,6 +108,28 @@ async def list_places(
     filters: Annotated[PlaceFilters, Depends(place_filters)], viewer: OptionalUser, session: SessionDep
 ) -> list[PlaceCard]:
     return await places.list_places(session, viewer, filters)
+
+
+@router.get("/places/page")
+async def list_page(
+    filters: Annotated[PlaceFilters, Depends(place_filters)],
+    viewer: OptionalUser,
+    session: SessionDep,
+    view: str | None = None,
+    center: str | None = None,
+    background: Literal["show", "hide"] = "show",
+    offset: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=map_list.MAX_PAGE)] = map_list.DEFAULT_PAGE,
+) -> PlacePage:
+    """The «Карта» list: every match city-wide, those in `view` first (SPEC §17)."""
+    order = place_list.ListOrder(
+        view=params.bbox(view),
+        center=params.lat_lng(center, "center"),
+        hide_background=background == "hide",
+        offset=offset,
+        limit=limit,
+    )
+    return await place_list.page(session, viewer, filters, order)
 
 
 @router.post("/places", status_code=status.HTTP_201_CREATED)

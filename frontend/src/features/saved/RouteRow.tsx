@@ -1,12 +1,11 @@
-import { Clock, Footprints, MapPin } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { Link } from 'react-router';
 
 import type { RouteCard } from '@/shared/api';
 import { cn } from '@/shared/lib/cn';
-import { formatDistance, formatDuration, pluralize, PLURALS } from '@/shared/lib/format';
-import { ROUTE_KIND_META } from '@/shared/lib/labels';
+import { formatDistance, formatDuration } from '@/shared/lib/format';
+import { ROUTE_DIFFICULTY_META, ROUTE_KIND_META } from '@/shared/lib/labels';
 import { TONES } from '@/shared/lib/tones';
+import { ListCard, ListMark } from '@/shared/ui';
 
 const VIEW = 64;
 const INSET = 10;
@@ -67,54 +66,31 @@ interface RouteRowProps {
   trailing?: ReactNode;
 }
 
-/** Saved route: path thumbnail in the kind's colour, title, distance, duration, stops. */
+/** Saved route: path thumbnail in the kind's colour, name, «how · how hard», length and time. */
 export function RouteRow({ route, trailing }: RouteRowProps) {
   const kind = ROUTE_KIND_META[route.kind];
-  const KindIcon = kind.icon;
+  const difficulty = route.difficulty ? ROUTE_DIFFICULTY_META[route.difficulty] : null;
 
   return (
-    <article className="relative flex gap-3 rounded-card border border-line/70 bg-surface p-2.5 transition-[border-color,box-shadow,scale] duration-150 hover:shadow-card has-[a:active]:scale-[0.98]">
-      <div
-        className={cn(
-          'relative size-[76px] shrink-0 overflow-hidden rounded-control',
-          TONES[kind.tone].soft,
-        )}
-      >
-        {route.cover_url ? (
+    <ListCard
+      media={
+        route.cover_url ? (
           <img src={route.cover_url} alt="" loading="lazy" className="size-full object-cover" />
         ) : (
-          <PathThumb path={route.path} />
-        )}
-      </div>
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <p className={cn('flex items-center gap-1 text-xs font-medium', TONES[kind.tone].text)}>
-          <KindIcon size={13} aria-hidden />
-          {kind.label}
-        </p>
-        <h3 className="line-clamp-2 text-base leading-tight font-semibold text-ink">
-          <Link
-            to={`/routes/${route.id}`}
-            className="after:absolute after:inset-0 after:rounded-card focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-brand"
-          >
-            {route.title}
-          </Link>
-        </h3>
-        <p className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-ink-soft">
-          <span className="flex items-center gap-1">
-            <Footprints size={13} aria-hidden />
-            {formatDistance(route.distance_m)}
+          <span className={cn('relative block size-full', TONES[kind.tone].soft)}>
+            <PathThumb path={route.path} />
           </span>
-          <span className="flex items-center gap-1">
-            <Clock size={13} aria-hidden />
-            {formatDuration(route.duration_min)}
-          </span>
-          <span className="flex items-center gap-1">
-            <MapPin size={13} aria-hidden />
-            {pluralize(route.stops_count, PLURALS.stop)}
-          </span>
-        </p>
-      </div>
-      {trailing && <div className="relative z-10 flex shrink-0 items-start">{trailing}</div>}
-    </article>
+        )
+      }
+      title={route.title}
+      to={`/routes/${route.id}`}
+      meta={difficulty ? `${kind.label} · ${difficulty.label.toLowerCase()}` : kind.label}
+      marks={
+        <ListMark strong>
+          {formatDistance(route.distance_m)} · {formatDuration(route.duration_min)}
+        </ListMark>
+      }
+      trailing={trailing}
+    />
   );
 }

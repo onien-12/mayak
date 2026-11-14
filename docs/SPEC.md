@@ -211,6 +211,15 @@ their own (rules in `app/domain/event_formats.py`):
   flow for a meetup at this venue (`venue_place_id`). The «где» step of a new event offers the
   venues within about 5 km of the pin, nearest first («Площадки рядом»).
 
+«События» lists events in one day-grouped list: what is going on now leads today's group, marked
+«Идёт сейчас» on its card, and the group's header folds those away for the session («Скрыть
+идущие · N» / «Показать идущие · N»; the map follows the list). The quick row above the list holds
+«Все даты», «Сегодня», «Завтра» and «Даты» (with «Выходные», «Неделя», «Месяц» as presets inside),
+then «Бесплатные», «Помощь» and «Городские события» — the same state as their twins in «Фильтры».
+What a person organises or joined is «Мои события» in their own profile (upcoming first, past and
+cancelled ones folded below, `GET /me/events?scope=past`); the events panel only links to it, in one
+line, when they have upcoming ones.
+
 The create control of «События» is one button «Создать» with the choices «Встреча», «Раздача»,
 «Нужна помощь», «Событие побольше» and «Предложить площадку»; a choice skips the steps it answers
 (layer, category). `is_meetup` is not a notion people see as such: «Я пойду» exists on every
@@ -686,10 +695,21 @@ belong to it and are browsed inside its card.
   on the area). The list item shows it as one tappable line «Скоро здесь: Забег с собаками · сб,
   12:00» (+ «ещё N»; «Сейчас здесь» once it has started) that opens the event in «События»; the
   card lists it first in «Скоро здесь». It also makes the location recommended (§23.5).
-- Lists (explore, search): areas come first as richer cards — those with a residents' upcoming
-  event inside on top (the sooner first), then the rest by interest; their inner places are not
-  repeated in the list while folded. The places follow, residents' ones before imported ones,
-  the nearest first within each group (subtitle «сначала от жителей, ближние выше»).
+- The «Карта» list holds everything that matches the filters and the search **city-wide**, not
+  only what is in view (the same default rules as the map: bare background objects and small
+  OSM territories stay out unless «Всё из OpenStreetMap» is on, §18). After «Для вас» it has two
+  groups under quiet dividers: «Сейчас на карте · 3 локации · 12 мест» — the locations (residents'
+  events first, then by interest) and places in the current map view — and «Ещё в городе» — the
+  other locations (residents' events first, then the nearest to the centre) and places. Places
+  are residents' first, then imported, the nearest first (to the viewer, else the map centre).
+  The header gives the total and its share in view («154 места · 12 на карте»).
+- Moving the map only re-sorts the list — nothing leaves it. The order follows the map when it
+  stops, while the reader is at the top of the list; further down it stays put and «Обновить
+  порядок» offers the new one. Places come in pages of 40 from `GET /places/page` (ordered on
+  the server: in view, residents', distance), «Показать ещё» asks for the next; the map's markers
+  still load by viewport. Phones: search and «Фильтры» sit in the panel above the list (the
+  filters, layer toggles and «Заметки» among them, open at the top of the list and the sheet
+  goes full height); nothing of the section floats over the map.
 
 Seed: ≥ 15 real areas (Нагорный парк, Спортивная набережная, набережная Цесаревича,
 Покровский парк, Адмиральский сквер, площадь Борцов Революции, Миллионка, сопка Орлиное
@@ -1607,11 +1627,17 @@ screened, not listed, playable only as a test. Ratings: only a player who finish
 screened like any review. Complaints use the ordinary mechanism with `target_type = "route"` and
 the quest id.
 
-**Editor** (`/quests/new`, `/quests/:id/edit`): tap the map to place a stage (or, with the «Старт»
-tool, the start), drag pins and rows to reorder, a sheet per stage with all of the above, then the
-quest's title, description, where it starts (public), estimated duration and an optional cover;
-«Черновик» saves it privately, «Опубликовать» publishes. Unsaved work is kept on the device and the
-editor asks before leaving, like the route builder. Validation messages are plain Russian.
+**Editor** (`/quests/new`, `/quests/:id/edit`): a new quest is written one stage page at a time —
+«Этап N из M» with a dot per stage to jump between them: put the stage on the map (a tap, or
+«Поставить в центре карты»), then on the same page its riddle, check, search zone, hint and story;
+«Следующий этап» checks the page (what is missing is said next to the field) and opens the next
+one, «Назад» returns with everything kept, «К описанию квеста» (from two stages on) goes on — a
+trailing page opened but left empty is dropped. «Все этапы» is the overview for reordering and
+deleting; editing an existing quest opens on it. The open stage's pin is highlighted. Then the
+quest's title, description, where it starts (public; marked on the map from this step), estimated
+duration and an optional cover; «Черновик» saves it privately, «Опубликовать» publishes. Drafts are
+kept as for routes (§12) and «Продолжить» returns to the stage page the author was on. Validation
+messages are plain Russian.
 
 **Data**: `quests` (keyed by the route id: start name and point, duration, cover photo),
 `quest_stages` (each with a key that is never reused), `quest_runs` (captain, team name, join

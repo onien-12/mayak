@@ -18,9 +18,12 @@ export const DURATION_OPTIONS = [30, 60, 90, 120, 180, 240] as const;
 export const DEFAULT_RADIUS = 40;
 export const DEFAULT_ZONE = 250;
 
-export interface DraftStage extends LatLng {
+export interface DraftStage {
   /** Client-side key (stable across reorders). */
   id: string;
+  /** Where the stage is; `null` until it is put on the map. */
+  lat: number | null;
+  lng: number | null;
   /** The 2GIS object under the tap that placed the stage: suggests its name. */
   objectId: string | null;
   /** The saved stage this is (players' progress follows it through reorders and edits). */
@@ -50,6 +53,8 @@ export interface QuestDraft {
   durationMin: number;
   cover: Photo | null;
   stages: DraftStage[];
+  /** The stage page the author was on (kept with the draft so «Продолжить» returns there). */
+  cursor?: string | null;
 }
 
 export type StageField = 'title' | 'riddle' | 'code' | 'question' | 'answers' | 'point';
@@ -87,11 +92,11 @@ export function emptyDraft(): QuestDraft {
   };
 }
 
-export function createStage(point: LatLng, fields: Partial<DraftStage> = {}): DraftStage {
+export function createStage(point: LatLng | null, fields: Partial<DraftStage> = {}): DraftStage {
   return {
     id: nextId(),
-    lat: point.lat,
-    lng: point.lng,
+    lat: point?.lat ?? null,
+    lng: point?.lng ?? null,
     objectId: null,
     serverId: null,
     title: '',
@@ -142,8 +147,38 @@ export function draftFromQuest(quest: QuestEditor): QuestDraft {
   };
 }
 
-function stageErrors(stage: DraftStage): Partial<Record<StageField, string>> {
+/** Where the stage stands, or `null` before it is put on the map. */
+export function pointOf(stage: DraftStage): LatLng | null {
+  return stage.lat === null || stage.lng === null ? null : { lat: stage.lat, lng: stage.lng };
+}
+
+/** Opened by «Следующий этап» and left untouched. */
+export function isEmptyStage(stage: DraftStage): boolean {
+  return (
+    pointOf(stage) === null &&
+    !stage.title.trim() &&
+    !stage.riddle.trim() &&
+    !stage.hint.trim() &&
+    !stage.reward.trim() &&
+    !stage.question.trim() &&
+    !stage.code.trim() &&
+    stage.answers.length === 0 &&
+    stage.photo === null
+  );
+}
+
+/** The stages that count: a trailing stage page opened but never filled is dropped silently. */
+export function filledStages(stages: readonly DraftStage[]): DraftStage[] {
+  let end = stages.length;
+  while (end > 0 && isEmptyStage(stages[end - 1] as DraftStage)) end -= 1;
+  return stages.slice(0, end);
+}
+
+/** What is missing on one stage page, said next to the field. */
+export function stageErrors(stage: DraftStage): Partial<Record<StageField, string>> {
   const errors: Partial<Record<StageField, string>> = {};
+  if (!pointOf(stage))
+    errors.point = 'Поставьте этап на карту: нажмите на карту или «Поставить в центре карты»';
   if (stage.title.trim().length < 2)
     errors.title = 'Назовите место — игрок увидит название, когда найдёт его';
   if (stage.riddle.trim().length < 5) errors.riddle = 'Напишите загадку — как найти это место';
@@ -166,16 +201,17 @@ export function validateDraft(draft: QuestDraft): DraftErrors {
     errors.startTitle = 'Подскажите, где собраться: «у входа в ГУМ со Светланской»';
   if (!draft.start)
     errors.start = 'Отметьте старт на карте: инструмент «Старт», затем нажмите на карту';
-  if (draft.stages.length < MIN_STAGES)
+  const stages = filledStages(draft.stages);
+  if (stages.length < MIN_STAGES)
     errors.stages = `В квесте должно быть хотя бы ${MIN_STAGES} этапа`;
   const stage: DraftErrors['stage'] = {};
-  for (const item of draft.stages) {
+  for (const item of stages) {
     const found = stageErrors(item);
     if (Object.keys(found).length > 0) stage[item.id] = found;
   }
   if (Object.keys(stage).length > 0) {
     errors.stage = stage;
-    errors.stages ??= 'Некоторые этапы не дописаны — они отмечены в списке';
+    errors.stages ??= 'Некоторые этапы не дописаны — они отмечены в «Всех этапах»';
   }
   return errors;
 }
@@ -195,11 +231,11 @@ export function toQuestInput(draft: QuestDraft, visibility: RouteVisibility): Qu
     duration_min: draft.durationMin,
     cover_photo_id: draft.cover?.id ?? null,
     visibility,
-    stages: draft.stages.map((stage) => ({
+    stages: filledStages(draft.stages).map((stage) => ({
       id: stage.serverId,
       title: stage.title.trim(),
-      lat: stage.lat,
-      lng: stage.lng,
+      lat: stage.lat ?? 0,
+      lng: stage.lng ?? 0,
       place_id: stage.placeId,
       riddle: stage.riddle.trim(),
       photo_id: stage.photo?.id ?? null,
@@ -257,7 +293,7 @@ export function serverErrors(
   for (const { field, message } of error.errors) {
     const [head, index, key] = field.split('.');
     if (head === 'stages' && index !== undefined) {
-      const item = draft.stages[Number(index)];
+      const item = filledStages(draft.stages)[Number(index)];
       if (!item) continue;
       const target = (key && STAGE_FIELDS[key]) || CONDITION_FIELD[item.condition];
       stage[item.id] = { ...stage[item.id], [target]: message };

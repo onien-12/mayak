@@ -7,7 +7,7 @@ export {
   type AreaEditorPreset,
 } from './editor/areaEditorStore';
 export { useCanManageAreas } from './editor/useCanManageAreas';
-export { AreaListItem, AreaThumb } from './list/AreaListItem';
+export { AreaListItem } from './list/AreaListItem';
 export { CommunityEventLine } from './list/CommunityEventLine';
 export { CreateAreaHint } from './list/CreateAreaHint';
 export { useMapAreas, useMapRecommendedAreas } from './map/areaLayerStore';

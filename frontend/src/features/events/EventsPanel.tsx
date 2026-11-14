@@ -1,5 +1,5 @@
 import { ChevronDown, RotateCcw, SlidersHorizontal } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { useSearchSignal } from '@/features/interests';
 import { useMapPlaces } from '@/features/map';
@@ -13,8 +13,9 @@ import { EventsFilters } from './EventsFilters';
 import { EventsResults } from './EventsResults';
 import { EventsSearch } from './EventsSearch';
 import { countActiveFilters, useEventsFilters } from './filtersStore';
+import { withoutHiddenOngoing } from './ongoing';
 import { periodPhrase } from './period';
-import { TimeChips } from './TimeChips';
+import { QuickChips } from './QuickChips';
 import { useEventsFeed, type EventsFeed } from './useEventsFeed';
 
 const FILTERS_ID = 'events-filters';
@@ -78,7 +79,17 @@ export default function EventsPanel() {
   const feed = useEventsFeed();
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filtersRef = useRevealOnOpen<HTMLElement>(filtersOpen);
-  useMapPlaces(feed.events);
+  // The map shows what the list shows: folded «идущие» leave it too.
+  const onMap = useMemo(
+    () =>
+      feed.events &&
+      withoutHiddenOngoing(feed.events, {
+        hideOngoing: filters.hideOngoing,
+        grouped: filters.sort === 'start' && !filters.past,
+      }),
+    [feed.events, filters.hideOngoing, filters.sort, filters.past],
+  );
+  useMapPlaces(onMap);
   useSearchSignal(filters.search);
 
   const activeFilters = countActiveFilters(filters);
@@ -120,7 +131,7 @@ export default function EventsPanel() {
             <FiltersToggle open={filtersOpen} count={activeFilters} onToggle={toggleFilters} />
           </div>
           {/* Phones: one row that scrolls sideways; the desktop panel has room to wrap. */}
-          <TimeChips className={isDesktop ? 'flex-wrap' : '-mx-4 px-4 [&>*]:h-9'} />
+          <QuickChips className={isDesktop ? 'flex-wrap' : '-mx-4 px-4 [&>*]:h-9'} />
         </div>
       }
       footer={<CreateMenu />}

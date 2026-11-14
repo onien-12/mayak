@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'motion/react';
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Outlet } from 'react-router';
 
@@ -17,15 +17,18 @@ import { SidePanel } from './SidePanel';
 
 /** Where the panel content is shown: the side panel or the bottom sheet adopts the content node. */
 function PanelSlot({ host }: { host: HTMLElement }) {
-  return (
-    <div
-      ref={(slot) => {
-        slot?.append(host);
-        return () => host.remove();
-      }}
-      className="h-full rounded-[inherit]"
-    />
+  // A stable ref: an inline one would detach and re-attach the content on every render of the
+  // route, and a re-attached node loses the scroll position of everything inside it.
+  const adopt = useCallback(
+    (slot: HTMLDivElement | null) => {
+      slot?.append(host);
+      return () => {
+        if (host.parentElement === slot) host.remove();
+      };
+    },
+    [host],
   );
+  return <div ref={adopt} className="h-full rounded-[inherit]" />;
 }
 
 function PanelFallback() {

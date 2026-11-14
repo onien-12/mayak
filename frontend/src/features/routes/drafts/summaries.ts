@@ -3,7 +3,7 @@ import { formatRelative, pluralize } from '@/shared/lib/format';
 import { isRouteDraft, visibleCount } from '../builder/model';
 import { ROUTE_PLURALS } from '../lib/plurals';
 import { QUEST_PLURALS } from '../quests/lib/meta';
-import { isQuestDraft } from '../quests/editor/model';
+import { filledStages, isQuestDraft } from '../quests/editor/model';
 import type { DraftKind } from './storage';
 
 export const UNTITLED = 'Без названия';
@@ -26,7 +26,7 @@ export function summarize(kind: DraftKind, draft: unknown): DraftSummary | null 
   if (!isQuestDraft(draft)) return null;
   return {
     title: draft.title.trim() || UNTITLED,
-    facts: pluralize(draft.stages.length, QUEST_PLURALS.stage),
+    facts: pluralize(filledStages(draft.stages).length, QUEST_PLURALS.stage),
   };
 }
 

@@ -11,14 +11,27 @@ interface DropdownProps {
   placement?: PopoverPlacement;
   label: string;
   className?: string;
+  /** Controlled mode (see `Popover`). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   children: ReactNode;
 }
 
 /** Action menu. Compose with `DropdownItem`, `DropdownLabel`, `DropdownSeparator`. */
-export function Dropdown({ trigger, placement, label, className, children }: DropdownProps) {
+export function Dropdown({
+  trigger,
+  placement,
+  label,
+  className,
+  open,
+  onOpenChange,
+  children,
+}: DropdownProps) {
   return (
     <Popover
       role="menu"
+      open={open}
+      onOpenChange={onOpenChange}
       label={label}
       placement={placement}
       trigger={trigger}

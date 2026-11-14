@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import StrEnum
 from operator import itemgetter
+from typing import Any
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -171,41 +172,47 @@ def _lifecycle_clauses(filters: PlaceFilters, now: datetime) -> list[object]:
     return clauses
 
 
-def _matches_json_filters(place: Place, filters: PlaceFilters) -> bool:
+def matches_json_filters(place: Place, filters: PlaceFilters) -> bool:
     """Tag and attribute filters run in Python: both live in JSON columns."""
     if filters.tags and not set(filters.tags).issubset(place.tags):
         return False
     return attribute_rules.matches_filters(place.attributes, filters.attrs)
 
 
-async def list_places(session: AsyncSession, viewer: User | None, filters: PlaceFilters) -> list[PlaceCard]:
-    now = utcnow()
-    statement = place_queries.card_query().where(
-        _visibility_clause(filters, viewer), *_lifecycle_clauses(filters, now)
-    )
+def filter_clauses(filters: PlaceFilters, viewer: User | None, now: datetime) -> list[Any]:
+    """The SQL conditions of `filters` on places joined with their event and issue; tags and
+    attributes run in Python (`matches_json_filters`)."""
+    clauses: list[Any] = [_visibility_clause(filters, viewer), *_lifecycle_clauses(filters, now)]
     if filters.bbox is not None:
-        statement = statement.where(
+        clauses += [
             Place.lat.between(filters.bbox.min_lat, filters.bbox.max_lat),
             Place.lng.between(filters.bbox.min_lng, filters.bbox.max_lng),
-        )
+        ]
     if filters.layers:
-        statement = statement.where(Place.layer.in_(filters.layers))
+        clauses.append(Place.layer.in_(filters.layers))
     if filters.category_ids:
-        statement = statement.where(Place.category_id.in_(filters.category_ids))
+        clauses.append(Place.category_id.in_(filters.category_ids))
     if filters.author_id is not None:
-        statement = statement.where(Place.author_id == filters.author_id)
+        clauses.append(Place.author_id == filters.author_id)
     if filters.query:
-        statement = statement.where(Place.search_text.contains(filters.query.casefold(), autoescape=True))
+        clauses.append(Place.search_text.contains(filters.query.casefold(), autoescape=True))
     if filters.area_id is not None:
-        statement = statement.where(Place.area_id == filters.area_id)
+        clauses.append(Place.area_id == filters.area_id)
     if filters.origin is not None:
         is_external = Place.external_source.is_not(None)
-        statement = statement.where(is_external if filters.origin is Origin.EXTERNAL else ~is_external)
+        clauses.append(is_external if filters.origin is Origin.EXTERNAL else ~is_external)
     if filters.near is not None:
         area = geo.bbox_around(*filters.near, filters.radius_m)
-        statement = statement.where(
-            Place.lat.between(area.min_lat, area.max_lat), Place.lng.between(area.min_lng, area.max_lng)
-        )
+        clauses += [
+            Place.lat.between(area.min_lat, area.max_lat),
+            Place.lng.between(area.min_lng, area.max_lng),
+        ]
+    return clauses
+
+
+async def list_places(session: AsyncSession, viewer: User | None, filters: PlaceFilters) -> list[PlaceCard]:
+    now = utcnow()
+    statement = place_queries.card_query().where(*filter_clauses(filters, viewer, now))
     usefulness = func.coalesce(PlaceQuality.usefulness, ai_moderation.NEUTRAL_USEFULNESS)
     statement = statement.outerjoin(PlaceQuality, PlaceQuality.place_id == Place.id).order_by(
         Place.trust_score.desc(), usefulness.desc(), Place.id.desc()
@@ -213,7 +220,7 @@ async def list_places(session: AsyncSession, viewer: User | None, filters: Place
     filters_in_python = bool(filters.tags or filters.attrs or filters.near)
     if not filters_in_python:
         statement = statement.limit(filters.limit)
-    places = [place for place in await session.scalars(statement) if _matches_json_filters(place, filters)]
+    places = [place for place in await session.scalars(statement) if matches_json_filters(place, filters)]
     if filters.near is not None:
         places = _nearest_first(places, filters.near, filters.radius_m)
     return await place_queries.cards(session, places[: filters.limit], now)

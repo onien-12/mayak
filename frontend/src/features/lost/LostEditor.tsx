@@ -74,7 +74,7 @@ function PointStep({ kind, initial, radius, onRadius, onBack, onConfirm }: Point
       )}
       <PanelLayout
         title={kind === 'lost' ? 'Где потеряли?' : 'Где нашли?'}
-        subtitle="Шаг 1 из 2"
+        subtitle="Потеряшки · шаг 1 из 2"
         onBack={onBack}
         backLabel="К потеряшкам"
         footer={
@@ -216,7 +216,7 @@ function DetailsStep({ draft, point, onChange, onBack }: DetailsStepProps) {
       )}
       <PanelLayout
         title={isLost ? 'Что потеряли?' : 'Что нашли?'}
-        subtitle="Шаг 2 из 2"
+        subtitle="Потеряшки · шаг 2 из 2"
         onBack={onBack}
         backLabel="К выбору места"
         footer={

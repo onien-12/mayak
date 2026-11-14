@@ -1,9 +1,7 @@
 import { Lock } from 'lucide-react';
 
 import type { RouteCard } from '@/shared/api';
-import { cn } from '@/shared/lib/cn';
 import { ROUTE_DIFFICULTY_META, ROUTE_KIND_META, ROUTE_STATUS_META } from '@/shared/lib/labels';
-import { TONES } from '@/shared/lib/tones';
 import { Badge } from '@/shared/ui';
 
 type BadgeRoute = Pick<RouteCard, 'kind' | 'difficulty' | 'status' | 'visibility'>;
@@ -28,26 +26,6 @@ export function RouteKindBadges({ route, size }: { route: BadgeRoute; size?: 'sm
         </Badge>
       )}
     </>
-  );
-}
-
-/** Compact one-line «🚲 На велосипеде · Средний» for list cards. */
-export function RouteKindLine({ route }: { route: BadgeRoute }) {
-  const kind = ROUTE_KIND_META[route.kind];
-  const difficulty = route.difficulty ? ROUTE_DIFFICULTY_META[route.difficulty] : null;
-  return (
-    <p className="flex min-w-0 items-center gap-1 text-xs font-medium">
-      <kind.icon size={13} aria-hidden className={cn('shrink-0', TONES[kind.tone].text)} />
-      <span className={cn('truncate', TONES[kind.tone].text)}>{kind.label}</span>
-      {difficulty && (
-        <>
-          <span aria-hidden className="text-ink-faint">
-            ·
-          </span>
-          <span className={cn('shrink-0', TONES[difficulty.tone].text)}>{difficulty.label}</span>
-        </>
-      )}
-    </p>
   );
 }
 

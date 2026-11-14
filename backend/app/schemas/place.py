@@ -467,3 +467,12 @@ class OfficialInfoIn(ApiModel):
     expected_fix_at: UtcDatetime | None = None
     appeal_number: Annotated[str, StringConstraints(strip_whitespace=True, max_length=60)] | None = None
     responsible_org: Annotated[str, StringConstraints(strip_whitespace=True, max_length=160)] | None = None
+
+
+class PlacePage(ApiModel):
+    """A page of the «Карта» list (SPEC §17): `total` matches city-wide, `in_view` of them in the
+    current map view — those come first."""
+
+    total: int
+    in_view: int
+    items: list[PlaceCard]

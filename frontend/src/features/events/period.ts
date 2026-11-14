@@ -7,10 +7,17 @@ const DAYS_IN_MONTH = 30;
 const SATURDAY = 6;
 const SUNDAY = 0;
 
-export const TIME_PRESETS: readonly { value: Exclude<TimePreset, 'custom'>; label: string }[] = [
+type PeriodPreset = Exclude<TimePreset, 'custom'>;
+
+/** Periods with a chip of their own in the quick row. */
+export const QUICK_PERIODS: readonly { value: PeriodPreset; label: string }[] = [
   { value: 'any', label: 'Все даты' },
   { value: 'today', label: 'Сегодня' },
   { value: 'tomorrow', label: 'Завтра' },
+];
+
+/** Longer periods, offered inside the date picker; the «Даты» chip shows the chosen one. */
+export const RANGE_PRESETS: readonly { value: PeriodPreset; label: string }[] = [
   { value: 'weekend', label: 'Выходные' },
   { value: 'week', label: 'Неделя' },
   { value: 'month', label: 'Месяц' },

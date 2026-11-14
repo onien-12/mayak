@@ -6,6 +6,8 @@ import type {
   PlaceCard,
   PlaceDetail,
   PlaceInput,
+  PlacePage,
+  PlacesPageQuery,
   PlacesQuery,
   PlaceUpdate,
   Review,
@@ -16,6 +18,8 @@ import type {
 export const placesApi = {
   list: (query: PlacesQuery = {}, signal?: AbortSignal) =>
     api.get<PlaceCard[]>('/places', { ...query }, signal),
+  page: (query: PlacesPageQuery, signal?: AbortSignal) =>
+    api.get<PlacePage>('/places/page', { ...query }, signal),
   get: (id: number) => api.get<PlaceDetail>(`/places/${id}`),
   create: (input: PlaceInput) => api.post<PlaceDetail>('/places', input),
   update: (id: number, input: PlaceUpdate) => api.patch<PlaceDetail>(`/places/${id}`, input),

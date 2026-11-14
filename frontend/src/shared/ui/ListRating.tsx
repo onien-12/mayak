@@ -17,24 +17,26 @@ interface ListRatingProps {
 }
 
 /**
- * «★ 4,6 (54 тыс.)» on list items: the combined rating when the server has one, otherwise
- * ours; its origin is named on hover and to screen readers.
+ * «★ 4,6» on list cards: the combined rating when the server has one, otherwise ours; its
+ * origin and how many ratings are behind it are named on hover and to screen readers (and on
+ * the item's own card).
  */
 export function ListRating({ item, ownLabel = 'Оценка жителей', className }: ListRatingProps) {
   const shown = shownRating(item);
   if (!shown) return null;
-  const label = shown.combined ? 'Оценка по Маяку и картам' : ownLabel;
+  const origin = shown.combined ? 'Оценка по Маяку и картам' : ownLabel;
+  const label = shown.count !== null ? `${origin}, оценок: ${formatCompact(shown.count)}` : origin;
   return (
     <span
       title={label}
-      className={cn('flex shrink-0 items-center gap-1 text-xs font-semibold text-ink', className)}
+      className={cn(
+        'flex shrink-0 items-center gap-1 text-[14px]/5 font-semibold text-ink',
+        className,
+      )}
     >
-      <Star size={13} aria-hidden className="fill-beam text-beam" />
+      <Star size={15} aria-hidden className="fill-beam text-beam" />
       <span className="sr-only">{label}:</span>
       {formatRating(shown.value)}
-      {shown.count !== null && (
-        <span className="font-normal text-ink-faint">({formatCompact(shown.count)})</span>
-      )}
     </span>
   );
 }

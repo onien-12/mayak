@@ -197,7 +197,7 @@ function ItemView({ item }: { item: LostItem }) {
       />
       <PanelLayout
         title={item.title}
-        subtitle={`${LOST_KIND_META[item.kind].label} · ${formatRelative(item.created_at)}`}
+        subtitle={`Потеряшки · ${LOST_KIND_META[item.kind].label.toLowerCase()} ${formatRelative(item.created_at)}`}
         onBack={() => navigate('/lost')}
         backLabel="К потеряшкам"
         actions={

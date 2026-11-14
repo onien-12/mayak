@@ -15,9 +15,8 @@ import type { StoredDraft } from '../../drafts/storage';
 import { QUEST_PLURALS } from '../lib/meta';
 import { DetailsStep } from './DetailsStep';
 import { EditorMapLayer } from './EditorMapLayer';
-import type { QuestDraft } from './model';
+import { pointOf, type QuestDraft } from './model';
 import { useAccountDraft } from './useAccountDraft';
-import { StageSheet } from './StageSheet';
 import { StagesStep } from './StagesStep';
 import { useQuestEditorStore } from './store';
 import { clearStoredQuestDraft, useQuestDraftAutosave } from './useQuestDraftAutosave';
@@ -79,7 +78,7 @@ export function EditorSession({ initial, questId, visibility }: EditorSessionPro
   const active = useQuestEditorStore((state) => state.sessionId === sessionId);
   const step = useQuestEditorStore((state) => state.step);
   const dirty = useQuestEditorStore((state) => state.dirty);
-  const editing = useQuestEditorStore((state) => state.editingId !== null);
+  const tool = useQuestEditorStore((state) => state.tool);
   const [savedId, setSavedId] = useState<number | null>(null);
   const [movedTo, setMovedTo] = useState<number | null>(null);
   const autosave = useQuestDraftAutosave(questId);
@@ -100,7 +99,7 @@ export function EditorSession({ initial, questId, visibility }: EditorSessionPro
     (restored: QuestDraft | null) => {
       const bounds = boundsOfPoints([
         ...(restored?.start ? [restored.start] : []),
-        ...(restored?.stages ?? []),
+        ...(restored?.stages ?? []).flatMap((stage) => pointOf(stage) ?? []),
       ]);
       if (bounds) fitBounds(bounds, { maxZoom: 16 });
     },
@@ -113,9 +112,9 @@ export function EditorSession({ initial, questId, visibility }: EditorSessionPro
   });
 
   useEffect(() => {
-    useQuestEditorStore.getState().start(sessionId, initial);
+    useQuestEditorStore.getState().start(sessionId, initial, questId === null);
     resumeDraft();
-  }, [sessionId, initial]);
+  }, [sessionId, initial, questId]);
 
   const onSaved = useCallback(
     (quest: QuestEditor) => {
@@ -140,7 +139,7 @@ export function EditorSession({ initial, questId, visibility }: EditorSessionPro
 
   return (
     <>
-      <EditorMapLayer interactive={step === 'stages' && !editing} />
+      <EditorMapLayer interactive={step === 'stages' || tool === 'start'} />
       {step === 'stages' ? (
         <StagesStep
           title={title}
@@ -167,7 +166,6 @@ export function EditorSession({ initial, questId, visibility }: EditorSessionPro
           notice={status}
         />
       )}
-      <StageSheet />
       <LeaveDialog
         blocker={blocker}
         flush={flush}

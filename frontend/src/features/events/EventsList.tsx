@@ -5,7 +5,9 @@ import { haversine, type LatLng } from '@/shared/lib/geo';
 import { StaggerItem } from '@/shared/ui';
 
 import { EventCard } from './EventCard';
-import { dayHeading, dayKey } from './period';
+import { useEventsFilters } from './filtersStore';
+import { isOngoing } from './ongoing';
+import { dayHeading, dayKey, toDayValue } from './period';
 
 interface DayGroup {
   key: string;
@@ -14,19 +16,26 @@ interface DayGroup {
   offset: number;
 }
 
-/** Groups in the order the days first appear (the API already sorts by start). */
-function groupByDay(events: readonly PlaceCard[]): DayGroup[] {
+/**
+ * Groups in the order the days first appear (the API already sorts by start). Whatever is going
+ * on now belongs to today — even an event that began yesterday — and leads today's group.
+ */
+function groupByDay(events: readonly PlaceCard[], today: string): DayGroup[] {
   const groups = new Map<string, PlaceCard[]>();
   for (const place of events) {
     if (!place.event) continue;
-    const key = dayKey(place.event.starts_at);
+    const key = isOngoing(place) ? today : dayKey(place.event.starts_at);
     const list = groups.get(key) ?? [];
     list.push(place);
     groups.set(key, list);
   }
   let offset = 0;
   return [...groups].map(([key, list]) => {
-    const group = { key, events: list, offset };
+    const ordered =
+      key === today
+        ? [...list.filter(isOngoing), ...list.filter((place) => !isOngoing(place))]
+        : list;
+    const group = { key, events: ordered, offset };
     offset += list.length;
     return group;
   });
@@ -56,7 +65,13 @@ export function EventsList({
   highlightId,
   afterFirstGroup,
 }: EventsListProps) {
-  const groups = useMemo(() => (grouped ? groupByDay(events) : null), [events, grouped]);
+  const hideOngoing = useEventsFilters((state) => state.hideOngoing);
+  const toggleOngoing = useEventsFilters((state) => state.toggleOngoing);
+  const today = toDayValue(new Date());
+  const groups = useMemo(
+    () => (grouped ? groupByDay(events, today) : null),
+    [events, grouped, today],
+  );
   const card = (place: PlaceCard, index: number, withDate: boolean) => (
     <StaggerItem key={place.id} index={index}>
       <EventCard
@@ -96,20 +111,43 @@ export function EventsList({
 
   return (
     <div className="flex flex-col gap-1">
-      {groups.map((group, groupIndex) => (
-        <Fragment key={group.key}>
-          <section aria-label={dayHeading(group.key)}>
-            <h2 className="sticky top-0 z-10 -mx-4 flex items-baseline justify-between bg-surface/90 px-4 py-2.5 backdrop-blur-md lg:-mx-5 lg:px-5 lite:bg-surface">
-              <span className="text-sm font-semibold text-ink">{dayHeading(group.key)}</span>
-              <span className="text-xs text-ink-faint tabular-nums">{group.events.length}</span>
-            </h2>
-            <ul className="flex flex-col gap-2 pb-2">
-              {group.events.map((place, index) => card(place, group.offset + index, false))}
-            </ul>
-          </section>
-          {groupIndex === 0 && afterFirstGroup && <div className="pb-2">{afterFirstGroup}</div>}
-        </Fragment>
-      ))}
+      {groups.map((group, groupIndex) => {
+        const ongoing = group.key === today ? group.events.filter(isOngoing).length : 0;
+        const shown =
+          ongoing > 0 && hideOngoing
+            ? group.events.filter((place) => !isOngoing(place))
+            : group.events;
+        return (
+          <Fragment key={group.key}>
+            <section aria-label={dayHeading(group.key)}>
+              <div className="sticky top-0 z-10 -mx-4 flex items-baseline gap-3 bg-surface/90 px-4 py-2.5 backdrop-blur-md lg:-mx-5 lg:px-5 lite:bg-surface">
+                <h2 className="text-sm font-semibold text-ink">{dayHeading(group.key)}</h2>
+                <span className="text-xs text-ink-faint tabular-nums">{shown.length}</span>
+                {ongoing > 0 && (
+                  <button
+                    type="button"
+                    aria-pressed={hideOngoing}
+                    onClick={toggleOngoing}
+                    className="tap-target relative ml-auto text-xs font-medium text-ink-soft hover:text-ink"
+                  >
+                    {hideOngoing ? 'Показать идущие' : 'Скрыть идущие'} · {ongoing}
+                  </button>
+                )}
+              </div>
+              {shown.length === 0 ? (
+                <p className="pb-3 text-sm text-ink-faint">
+                  Сегодня есть только то, что идёт сейчас, — оно скрыто.
+                </p>
+              ) : (
+                <ul className="flex flex-col gap-2 pb-2">
+                  {shown.map((place, index) => card(place, group.offset + index, false))}
+                </ul>
+              )}
+            </section>
+            {groupIndex === 0 && afterFirstGroup && <div className="pb-2">{afterFirstGroup}</div>}
+          </Fragment>
+        );
+      })}
     </div>
   );
 }

@@ -29,6 +29,9 @@ interface EventsFiltersState extends EventsFilters {
   /** Search text — kept across navigation, not across reloads. */
   search: string;
   setSearch: (search: string) => void;
+  /** Today's events that are going on now are folded away — kept for the session, not saved. */
+  hideOngoing: boolean;
+  toggleOngoing: () => void;
   setTime: (time: Exclude<TimePreset, 'custom'>) => void;
   setRange: (range: DayRange) => void;
   toggleCategory: (id: number) => void;
@@ -59,6 +62,8 @@ export const useEventsFilters = create<EventsFiltersState>()(
       ...DEFAULTS,
       search: '',
       setSearch: (search) => set({ search }),
+      hideOngoing: false,
+      toggleOngoing: () => set({ hideOngoing: !get().hideOngoing }),
       setTime: (time) => set({ time, range: null }),
       setRange: (range) => set({ time: 'custom', range }),
       toggleCategory: (id) => {
@@ -88,7 +93,7 @@ export const useEventsFilters = create<EventsFiltersState>()(
         const { kind: _kind, signUpOnly: _signUpOnly, ...rest } = state;
         return rest;
       },
-      partialize: ({ search: _search, ...state }) => state,
+      partialize: ({ search: _search, hideOngoing: _hideOngoing, ...state }) => state,
     },
   ),
 );

@@ -188,6 +188,9 @@ async def test_reschedule_and_cancel_notify_participants(world: World, client: A
     assert [(item["id"], item["event"]["phase"]) for item in everything] == [(event["id"], "cancelled")]
     assert (await guest.get("/me/events")).json() == []
     assert (await organizer.get("/me/events")).json() == []
+    for person in (guest, organizer):
+        past = (await person.get("/me/events", params={"scope": "past"})).json()
+        assert [item["id"] for item in past] == [event["id"]]
     assert (await client.get(f"{API}/places/{event['id']}")).status_code == 200
     assert (await guest.put(f"/places/{event['id']}/event/participation")).status_code == 200
     stranger = await world.actor("stranger")

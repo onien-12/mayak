@@ -1,12 +1,10 @@
-import { CalendarX, Lock, UserPlus, type LucideIcon } from 'lucide-react';
-import { motion } from 'motion/react';
+import { CalendarX, Lock, type LucideIcon } from 'lucide-react';
 
 import type { EventBrief } from '@/shared/api';
 import { cn } from '@/shared/lib/cn';
-import { formatNumber } from '@/shared/lib/format';
 import { PHASE_META } from '@/shared/lib/labels';
 import type { Tone } from '@/shared/lib/tones';
-import { Badge, SPRING } from '@/shared/ui';
+import { Badge } from '@/shared/ui';
 
 interface PhaseInfo {
   label: string;
@@ -31,9 +29,8 @@ function phaseInfo(event: EventBrief): PhaseInfo | null {
     case 'finished':
       return { label: PHASE_META.finished.label, tone: 'neutral' };
     case 'open':
-      return event.is_meetup ? { label: 'Набор открыт', tone: 'success', icon: UserPlus } : null;
     case 'soon':
-      // The start time is already the first line of the card.
+      // Open for joining is the usual state, and the start time is on the card already.
       return null;
   }
 }
@@ -64,44 +61,5 @@ export function PhaseBadge({ event }: { event: EventBrief }) {
     <Badge tone={info.tone} icon={info.icon}>
       {info.label}
     </Badge>
-  );
-}
-
-/**
- * Price: «Бесплатно», «600 ₽» or the source's note. Unknown price (`null`, imported events)
- * shows the note or nothing — never «бесплатно».
- */
-export function PriceBadge({ event }: { event: EventBrief }) {
-  if (event.price === null) {
-    return event.price_note ? <Badge>{event.price_note}</Badge> : null;
-  }
-  if (event.price === 0) return <Badge tone="success">Бесплатно</Badge>;
-  return <Badge>{event.price_note ?? `${formatNumber(event.price)} ₽`}</Badge>;
-}
-
-/** Meetups with a capacity: «5/12» with a compact fill bar. */
-export function SeatsMeter({ event }: { event: EventBrief }) {
-  if (event.capacity === null) return null;
-  const share = Math.min(1, event.participants_count / Math.max(1, event.capacity));
-  return (
-    <span
-      className="inline-flex h-6 shrink-0 items-center gap-1.5 text-xs font-medium text-ink-soft"
-      aria-label={`Записались ${event.participants_count} из ${event.capacity}`}
-    >
-      <span className="h-1.5 w-10 overflow-hidden rounded-full bg-canvas">
-        <motion.span
-          initial={{ scaleX: 0 }}
-          animate={{ scaleX: Math.max(share, 0.04) }}
-          transition={SPRING.soft}
-          className={cn(
-            'block h-full origin-left rounded-full',
-            share >= 1 ? 'bg-ink-faint' : 'bg-event',
-          )}
-        />
-      </span>
-      <span className="tabular-nums">
-        {event.participants_count}/{event.capacity}
-      </span>
-    </span>
   );
 }

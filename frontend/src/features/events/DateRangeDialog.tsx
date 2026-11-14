@@ -1,15 +1,18 @@
 import { useState } from 'react';
 
-import { Button, Field, Input, Modal } from '@/shared/ui';
+import { Button, Chip, Field, Input, Modal } from '@/shared/ui';
 
-import type { DayRange } from './filtersStore';
-import { toDayValue } from './period';
+import type { DayRange, TimePreset } from './filtersStore';
+import { RANGE_PRESETS, toDayValue } from './period';
 
 interface DateRangeDialogProps {
   open: boolean;
   onClose: () => void;
   initial: DayRange | null;
   onApply: (range: DayRange) => void;
+  /** The current period, to mark a chosen preset. */
+  time: TimePreset;
+  onPreset: (preset: Exclude<TimePreset, 'custom'>) => void;
 }
 
 function defaultRange(): DayRange {
@@ -17,8 +20,15 @@ function defaultRange(): DayRange {
   return { from: today, to: today };
 }
 
-/** Custom period of the afisha: two native date inputs (the best picker on phones). */
-export function DateRangeDialog({ open, onClose, initial, onApply }: DateRangeDialogProps) {
+/** Period beyond the quick chips: ready presets, or two native date inputs (the best picker on phones). */
+export function DateRangeDialog({
+  open,
+  onClose,
+  initial,
+  onApply,
+  time,
+  onPreset,
+}: DateRangeDialogProps) {
   const [range, setRange] = useState<DayRange>(() => initial ?? defaultRange());
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
@@ -51,6 +61,21 @@ export function DateRangeDialog({ open, onClose, initial, onApply }: DateRangeDi
         </>
       }
     >
+      <div role="group" aria-label="Готовые периоды" className="mb-4 flex flex-wrap gap-2">
+        {RANGE_PRESETS.map((preset) => (
+          <Chip
+            key={preset.value}
+            tone="event"
+            selected={time === preset.value}
+            onClick={() => {
+              onPreset(preset.value);
+              onClose();
+            }}
+          >
+            {preset.label}
+          </Chip>
+        ))}
+      </div>
       <div className="grid grid-cols-2 gap-3">
         <Field label="С" htmlFor="events-from">
           <Input

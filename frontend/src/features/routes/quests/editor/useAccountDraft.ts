@@ -4,7 +4,7 @@ import { errorMessage, queryKeys, questsApi, type RouteVisibility } from '@/shar
 import { toast } from '@/shared/ui';
 
 import type { AccountBlocker, AccountSave } from '../../drafts/DraftStatus';
-import { MIN_STAGES, toQuestInput, validateDraft, type QuestDraft } from './model';
+import { filledStages, MIN_STAGES, toQuestInput, validateDraft, type QuestDraft } from './model';
 import { useQuestEditorStore } from './store';
 
 export const ACCOUNT_DRAFT_SAVED =
@@ -19,22 +19,22 @@ function toDetails(field: 'title' | 'startTitle', message: string): () => void {
 }
 
 function blockerOf(draft: QuestDraft): AccountBlocker | null {
-  const missing = MIN_STAGES - draft.stages.length;
+  const stages = filledStages(draft.stages);
+  const missing = MIN_STAGES - stages.length;
   if (missing >= 2) return { text: 'добавьте два этапа' };
   if (missing === 1) return { text: 'добавьте ещё один этап' };
   const errors = validateDraft(draft);
-  const unfinished = draft.stages.findIndex((stage) => errors.stage?.[stage.id]);
+  const unfinished = stages.findIndex((stage) => errors.stage?.[stage.id]);
   if (unfinished !== -1) {
-    const stage = draft.stages[unfinished];
+    const stage = stages[unfinished];
     return {
       text: `допишите этап ${unfinished + 1}`,
       fix: {
         label: 'Открыть',
         run: () => {
           const store = useQuestEditorStore.getState();
-          store.setStep('stages');
           store.setErrors(errors);
-          if (stage) store.openEditor(stage.id);
+          if (stage) store.openStage(stage.id);
         },
       },
     };
@@ -45,9 +45,7 @@ function blockerOf(draft: QuestDraft): AccountBlocker | null {
       fix: {
         label: 'Отметить',
         run: () => {
-          const store = useQuestEditorStore.getState();
-          store.setStep('stages');
-          store.setTool('start');
+          useQuestEditorStore.getState().setTool('start');
         },
       },
     };

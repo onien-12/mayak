@@ -1,10 +1,10 @@
 import { keepPreviousData, useQueries, type UseQueryResult } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
-import { useMap, useMapFolded, useMapViewport, useUserLocation } from '@/features/map';
+import { useMap, useMapFolded, useMapViewport } from '@/features/map';
 import { placesApi, queryKeys, type PlaceCard, type PlacesQuery } from '@/shared/api';
 import { useCategories, useDebouncedValue } from '@/shared/hooks';
-import { boundsContain, boundsToBbox, haversine, snapBoundsOutward } from '@/shared/lib/geo';
+import { boundsToBbox, snapBoundsOutward } from '@/shared/lib/geo';
 import { isBareBackground, isUnconfirmedOsm } from '@/shared/lib/osm';
 
 import { MAP_LAYERS, useExploreFilters, type ExploreFilters } from './filtersStore';
@@ -13,23 +13,13 @@ const SEARCH_DEBOUNCE_MS = 350;
 const MIN_SEARCH_LENGTH = 2;
 const NO_PLACES: PlaceCard[] = [];
 
-export interface NearbyPlace {
-  place: PlaceCard;
-  /** Metres from the user; `undefined` when the user location is unknown. */
-  distanceM: number | undefined;
-}
-
-function buildQuery(
-  filters: ExploreFilters,
-  search: string,
-  bbox: string | undefined,
-): PlacesQuery {
+/** The filters of the section as request parameters — shared by the markers and the list. */
+export function placeFilterParams(filters: ExploreFilters, search: string) {
   const attrs = Object.entries(filters.attrs).map(([key, value]) => `${key}:${value}`);
   if (filters.free) attrs.push('free:true');
   if (filters.accessible) attrs.push('accessible:true');
 
   return {
-    bbox: search ? undefined : bbox,
     q: search || undefined,
     // Always named: the server's default is every layer, and the map shows places only — a
     // search finds no events or problems here either.
@@ -37,7 +27,15 @@ function buildQuery(
     categories: filters.categoryIds.length > 0 ? filters.categoryIds : undefined,
     min_status: filters.minStatus === 'any' ? undefined : filters.minStatus,
     attrs: attrs.length > 0 ? attrs : undefined,
-  };
+  } satisfies PlacesQuery;
+}
+
+function buildQuery(
+  filters: ExploreFilters,
+  search: string,
+  bbox: string | undefined,
+): PlacesQuery {
+  return { ...placeFilterParams(filters, search), bbox: search ? undefined : bbox };
 }
 
 /**
@@ -66,10 +64,9 @@ function combinePlaceQueries(results: UseQueryResult<PlaceCard[]>[]) {
 }
 
 /**
- * Places for the explore section: everything matching the filters around the current
- * viewport (for markers) and the part of it that is actually visible, residents' first and
- * nearest first within that (for the list). A text search looks through the whole city instead
- * of the viewport.
+ * The markers of the explore section: everything matching the filters around the current
+ * viewport. A text search looks through the whole city instead of the viewport. The list under
+ * the map is the city-wide `useExploreList`.
  */
 export type ExploreResults = ReturnType<typeof useExplorePlaces>;
 
@@ -79,7 +76,6 @@ export function useExplorePlaces() {
   const activeSearch = search.length >= MIN_SEARCH_LENGTH ? search : '';
   const viewport = useMapViewport();
   const { status } = useMap();
-  const { location } = useUserLocation();
 
   const bbox = viewport ? boundsToBbox(snapBoundsOutward(viewport.bounds)) : undefined;
   const params = buildQuery(filters, activeSearch, bbox);
@@ -117,30 +113,9 @@ export function useExplorePlaces() {
       }),
     [data, trustedOnly, includeUnnamed, activeSearch, categoryIds, byId],
   );
-  const bounds = viewport?.bounds;
-  const origin = location?.point ?? viewport?.center;
-  const showDistance = Boolean(location);
-
-  const nearby = useMemo<NearbyPlace[]>(() => {
-    if (!places) return [];
-    const visible =
-      activeSearch || !bounds ? places : places.filter((place) => boundsContain(bounds, place));
-    // Residents' places first, then imported ones; the nearest first within each.
-    return visible
-      .map((place) => ({ place, distance: origin ? haversine(origin, place) : 0 }))
-      .sort(
-        (a, b) =>
-          Number(a.place.external !== null) - Number(b.place.external !== null) ||
-          a.distance - b.distance,
-      )
-      .map(({ place, distance }) => ({ place, distanceM: showDistance ? distance : undefined }));
-  }, [places, bounds, origin, showDistance, activeSearch]);
-
   return {
     /** All fetched places — pass to `useMapPlaces`. */
     places,
-    /** Visible places, residents' first, then by distance — render as the list. */
-    nearby,
     activeSearch,
     hasLayers,
     isLoading: hasLayers && query.isPending,

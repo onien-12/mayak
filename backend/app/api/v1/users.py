@@ -89,8 +89,11 @@ async def list_my_favorites(user: CurrentUser, session: SessionDep) -> Favorites
 
 
 @router.get("/me/events")
-async def list_my_events(user: CurrentUser, session: SessionDep) -> list[PlaceCard]:
-    return await events.list_my_events(session, user)
+async def list_my_events(
+    user: CurrentUser, session: SessionDep, scope: events.MyEventsScope = events.MyEventsScope.UPCOMING
+) -> list[PlaceCard]:
+    """`scope=past`: finished or cancelled ones, the latest first."""
+    return await events.list_my_events(session, user, scope)
 
 
 @router.get("/me/subscriptions")

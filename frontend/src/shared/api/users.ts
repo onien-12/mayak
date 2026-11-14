@@ -26,7 +26,9 @@ export const usersApi = {
 
   reputation: (limit = 50) => api.get<ReputationEvent[]>('/me/reputation', { limit }),
   favorites: () => api.get<Favorites>('/me/favorites'),
-  myEvents: () => api.get<PlaceCard[]>('/me/events'),
+  /** Joined or organised: upcoming by start, or `past` (finished / cancelled) latest first. */
+  myEvents: (scope: 'upcoming' | 'past' = 'upcoming') =>
+    api.get<PlaceCard[]>('/me/events', { scope }),
   subscriptions: () => api.get<Subscription[]>('/me/subscriptions'),
   createSubscription: (input: SubscriptionInput) =>
     api.post<Subscription>('/me/subscriptions', input),

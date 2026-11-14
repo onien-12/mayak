@@ -40,6 +40,11 @@ class EventScope(StrEnum):
     ALL = "all"
 
 
+class MyEventsScope(StrEnum):
+    UPCOMING = "upcoming"
+    PAST = "past"
+
+
 class MeetupFilter(StrEnum):
     ONLY = "only"
     EXCLUDE = "exclude"
@@ -136,21 +141,32 @@ async def list_events(
     return await place_queries.cards(session, page, now)
 
 
-async def list_my_events(session: AsyncSession, user: User) -> list[PlaceCard]:
-    """Events the user joined or organises that are neither finished nor cancelled, by start time."""
+MY_PAST_LIMIT = 50
+
+
+async def list_my_events(
+    session: AsyncSession, user: User, scope: MyEventsScope = MyEventsScope.UPCOMING
+) -> list[PlaceCard]:
+    """Events the user joined or organises. Upcoming: neither finished nor cancelled, by start
+    time. Past: finished or cancelled, the latest first (the last 50)."""
     now = utcnow()
     joined = select(EventParticipant.place_id).where(EventParticipant.user_id == user.id)
-    rows = await session.scalars(
-        place_queries.card_query()
-        .where(
-            Place.layer == Layer.EVENT,
-            Place.status.in_((*PUBLIC_STATUSES, PlaceStatus.PENDING)),
-            EventDetails.ends_at >= now,
-            EventDetails.is_cancelled.is_(False),
-            or_(Place.author_id == user.id, Place.id.in_(joined)),
-        )
-        .order_by(EventDetails.starts_at, Place.id)
+    statement = place_queries.card_query().where(
+        Place.layer == Layer.EVENT,
+        Place.status.in_((*PUBLIC_STATUSES, PlaceStatus.PENDING)),
+        or_(Place.author_id == user.id, Place.id.in_(joined)),
     )
+    if scope is MyEventsScope.PAST:
+        statement = (
+            statement.where(or_(EventDetails.ends_at < now, EventDetails.is_cancelled.is_(True)))
+            .order_by(EventDetails.starts_at.desc(), Place.id.desc())
+            .limit(MY_PAST_LIMIT)
+        )
+    else:
+        statement = statement.where(
+            EventDetails.ends_at >= now, EventDetails.is_cancelled.is_(False)
+        ).order_by(EventDetails.starts_at, Place.id)
+    rows = await session.scalars(statement)
     return await place_queries.cards(session, list(rows), now)
 
 

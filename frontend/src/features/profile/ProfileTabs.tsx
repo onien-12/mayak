@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 
 import { Tabs, TWEEN } from '@/shared/ui';
 
+import { EventsTab } from './EventsTab';
 import { PlacesTab } from './PlacesTab';
 import { ReputationTab } from './ReputationTab';
 import { RoutesTab } from './RoutesTab';
@@ -51,6 +52,7 @@ export function ProfileTabs({ userId, own, onPickHome, state }: ProfileTabsProps
         >
           {tab === 'places' && <PlacesTab userId={userId} own={own} />}
           {tab === 'routes' && <RoutesTab userId={userId} />}
+          {tab === 'events' && <EventsTab />}
           {tab === 'reputation' && <ReputationTab />}
           {tab === 'subscriptions' && <SubscriptionsTab />}
           {tab === 'settings' && <SettingsTab onPickHome={onPickHome} />}

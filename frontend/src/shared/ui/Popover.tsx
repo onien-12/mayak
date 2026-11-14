@@ -9,7 +9,7 @@ import { ModalSurface } from './ModalSurface';
 import { popVariants } from './motion';
 
 export type PopoverPlacement =
-  'bottom-start' | 'bottom-end' | 'top-start' | 'top-end' | 'right-end';
+  'bottom-start' | 'bottom-end' | 'top-start' | 'top-end' | 'right-start' | 'right-end';
 
 const GAP = 8;
 const EDGE = 8;
@@ -41,6 +41,12 @@ function computeStyle(rect: DOMRect, placement: PopoverPlacement): CSSProperties
         right: Math.max(EDGE, vw - rect.right),
         maxHeight: rect.top - GAP - EDGE,
       };
+    case 'right-start':
+      return {
+        left: rect.right + GAP,
+        top: Math.max(EDGE, rect.top),
+        maxHeight: vh - Math.max(EDGE, rect.top) - EDGE,
+      };
     case 'right-end':
       return {
         left: rect.right + GAP,
@@ -55,6 +61,7 @@ const ORIGINS: Record<PopoverPlacement, string> = {
   'bottom-end': 'origin-top-right',
   'top-start': 'origin-bottom-left',
   'top-end': 'origin-bottom-right',
+  'right-start': 'origin-top-left',
   'right-end': 'origin-bottom-left',
 };
 

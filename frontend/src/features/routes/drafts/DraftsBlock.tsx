@@ -1,7 +1,7 @@
-import { Cloud, FilePen, HardDrive, Play, Trash2 } from 'lucide-react';
+import { Cloud, FilePen, HardDrive, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
-import { Button, ConfirmDialog, IconButton, StaggerItem } from '@/shared/ui';
+import { ConfirmDialog, IconButton, ListCard, ListMark, StaggerItem } from '@/shared/ui';
 import { savedAgo } from './summaries';
 
 export interface DraftRow {
@@ -17,33 +17,32 @@ export interface DraftRow {
   remove: { title: string; text: string; run: () => void; busy?: boolean };
 }
 
+/** A draft row: a tap continues it; the bin asks before removing. */
 function Row({ row, onDelete }: { row: DraftRow; onDelete: () => void }) {
   const Where = row.where === 'device' ? HardDrive : Cloud;
   return (
-    <li className="flex flex-col gap-2 rounded-card border border-dashed border-ink-faint/50 bg-surface p-3">
-      <div className="flex items-start gap-3">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-canvas text-ink-soft">
-          <FilePen size={17} aria-hidden />
+    <ListCard
+      dashed
+      compact
+      media={
+        <span className="flex size-full items-center justify-center text-ink-soft">
+          <FilePen size={20} aria-hidden />
         </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-semibold text-ink">{row.title}</span>
-          <span className="block text-xs text-ink-soft">
-            {row.facts} · сохранён {savedAgo(row.savedAt)}
-          </span>
-          <span className="flex items-center gap-1 text-xs text-ink-soft">
-            <Where size={12} aria-hidden className="shrink-0" />
-            {row.where === 'device' ? 'на этом устройстве' : 'в аккаунте'}
-            {row.note && ` · ${row.note}`}
-          </span>
-        </span>
-      </div>
-      <div className="flex items-center justify-end gap-1">
+      }
+      title={row.title}
+      label={`Продолжить черновик «${row.title}»`}
+      onSelect={row.onContinue}
+      meta={`${row.facts} · сохранён ${savedAgo(row.savedAt)}`}
+      marks={
+        <ListMark icon={Where}>
+          {row.where === 'device' ? 'на этом устройстве' : 'в аккаунте'}
+          {row.note && ` · ${row.note}`}
+        </ListMark>
+      }
+      trailing={
         <IconButton icon={Trash2} label={`Удалить черновик «${row.title}»`} onClick={onDelete} />
-        <Button size="sm" icon={Play} onClick={row.onContinue}>
-          Продолжить
-        </Button>
-      </div>
-    </li>
+      }
+    />
   );
 }
 

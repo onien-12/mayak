@@ -14,7 +14,7 @@ import {
   type PopoverTriggerProps,
 } from '@/shared/ui';
 
-import { MODERATION_NAV, PROBLEMS_NAV, SAVED_NAV, STATS_NAV, type NavItem } from './navigation';
+import { moreNav, type NavItem } from './navigation';
 
 interface UserMenuProps {
   placement: PopoverPlacement;
@@ -25,16 +25,25 @@ interface UserMenuProps {
   trigger: (props: PopoverTriggerProps, state: { open: boolean }) => ReactNode;
 }
 
+/** The sections of «Ещё», each with a short line saying what is behind the word. */
+export function SectionItems({ sections }: { sections: readonly NavItem[] }) {
+  const navigate = useNavigate();
+  return sections.map((item) => (
+    <DropdownItem key={item.to} icon={item.icon} onSelect={() => navigate(item.to)}>
+      <span className="flex min-w-0 flex-col py-1.5 leading-tight">
+        <span>{item.label}</span>
+        {item.hint && (
+          <span className="mt-0.5 text-xs font-normal text-ink-faint lg:text-2xs">{item.hint}</span>
+        )}
+      </span>
+    </DropdownItem>
+  ));
+}
+
 /** Auth-aware account menu: profile / sign out for users, sign in / sign up for guests. */
 export function UserMenu({ placement, withSections = false, trigger }: UserMenuProps) {
   const { user, isModerator, logout } = useAuth();
   const navigate = useNavigate();
-  const sections: NavItem[] = [
-    PROBLEMS_NAV,
-    SAVED_NAV,
-    STATS_NAV,
-    ...(isModerator ? [MODERATION_NAV] : []),
-  ];
 
   return (
     <Dropdown
@@ -45,11 +54,7 @@ export function UserMenu({ placement, withSections = false, trigger }: UserMenuP
     >
       {withSections && (
         <>
-          {sections.map((item) => (
-            <DropdownItem key={item.to} icon={item.icon} onSelect={() => navigate(item.to)}>
-              {item.label}
-            </DropdownItem>
-          ))}
+          <SectionItems sections={moreNav(isModerator)} />
           <DropdownSeparator />
         </>
       )}

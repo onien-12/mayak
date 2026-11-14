@@ -1,6 +1,7 @@
 import { useSearchParams } from 'react-router';
 
-export type ProfileTab = 'places' | 'routes' | 'reputation' | 'subscriptions' | 'settings';
+export type ProfileTab =
+  'places' | 'routes' | 'events' | 'reputation' | 'subscriptions' | 'settings';
 
 const PUBLIC_TABS = [
   { value: 'places', label: 'Места' },
@@ -9,6 +10,7 @@ const PUBLIC_TABS = [
 
 const OWN_TABS = [
   ...PUBLIC_TABS,
+  { value: 'events', label: 'Мои события' },
   { value: 'reputation', label: 'Репутация' },
   { value: 'subscriptions', label: 'Подписки' },
   { value: 'settings', label: 'Настройки' },

@@ -7,7 +7,8 @@ interface PlacementPromptProps {
   /** «Нажмите на карту — там будет этап 3». */
   text: string;
   onCenter: () => void;
-  onCancel: () => void;
+  /** Absent when there is nothing to go back to (a new stage waiting for its point). */
+  onCancel?: () => void;
 }
 
 /**
@@ -31,9 +32,11 @@ export function PlacementPrompt({ text, onCenter, onCancel }: PlacementPromptPro
         <Button size="sm" icon={Crosshair} onClick={onCenter} className="flex-1">
           Поставить в центре карты
         </Button>
-        <Button size="sm" variant="secondary" icon={X} onClick={onCancel}>
-          Отмена
-        </Button>
+        {onCancel && (
+          <Button size="sm" variant="secondary" icon={X} onClick={onCancel}>
+            Отмена
+          </Button>
+        )}
       </div>
     </motion.div>
   );

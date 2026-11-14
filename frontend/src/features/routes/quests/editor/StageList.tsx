@@ -4,16 +4,18 @@ import {
   Image as ImageIcon,
   Lightbulb,
   ScrollText,
+  X,
 } from 'lucide-react';
 import { Reorder, useDragControls } from 'motion/react';
 import { useMemo } from 'react';
 
 import { cn } from '@/shared/lib/cn';
 import { TONES } from '@/shared/lib/tones';
-import { SPRING } from '@/shared/ui';
+import { IconButton, SPRING } from '@/shared/ui';
 
 import { CONDITION_META } from '../lib/meta';
-import type { DraftStage } from './model';
+import { removeStageWithUndo } from './actions';
+import { pointOf, type DraftStage } from './model';
 import { useQuestEditorStore } from './store';
 
 function StageRow({
@@ -26,7 +28,7 @@ function StageRow({
   problem: boolean;
 }) {
   const controls = useDragControls();
-  const openEditor = useQuestEditorStore((state) => state.openEditor);
+  const openStage = useQuestEditorStore((state) => state.openStage);
   const condition = CONDITION_META[stage.condition];
 
   return (
@@ -41,7 +43,7 @@ function StageRow({
       exit={{ opacity: 0, scale: 0.96 }}
       whileDrag={{ scale: 1.03, boxShadow: 'var(--shadow-float)', zIndex: 20 }}
       className={cn(
-        'relative flex items-center gap-1 rounded-card border bg-surface py-1.5 pr-2',
+        'relative flex items-center gap-1 rounded-card border bg-surface py-1.5 pr-1',
         problem ? 'border-danger/60 bg-danger-soft/40' : 'border-line/80',
       )}
     >
@@ -55,7 +57,7 @@ function StageRow({
       </button>
       <button
         type="button"
-        onClick={() => openEditor(stage.id)}
+        onClick={() => openStage(stage.id)}
         className="flex min-w-0 flex-1 items-center gap-3 py-1 text-left"
       >
         <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-event text-sm font-semibold text-white tabular-nums">
@@ -99,7 +101,9 @@ function StageRow({
                 className="shrink-0 text-ink-soft"
               />
             )}
-            {problem ? (
+            {!pointOf(stage) ? (
+              <span className="truncate text-danger-ink">· не на карте</span>
+            ) : problem ? (
               <span className="truncate text-danger-ink">· допишите этап</span>
             ) : (
               !stage.riddle.trim() && (
@@ -109,11 +113,16 @@ function StageRow({
           </span>
         </span>
       </button>
+      <IconButton
+        icon={X}
+        label={`Удалить этап ${number}`}
+        onClick={() => removeStageWithUndo(stage.id)}
+      />
     </Reorder.Item>
   );
 }
 
-/** The stages in playing order: drag by the handle to reorder, tap to edit. */
+/** «Все этапы» in playing order: drag by the handle to reorder, tap to open, ✕ to delete. */
 export function StageList() {
   const stages = useQuestEditorStore((state) => state.draft.stages);
   const problems = useQuestEditorStore((state) => state.errors.stage);

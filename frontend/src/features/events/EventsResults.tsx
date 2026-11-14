@@ -1,20 +1,17 @@
-import { useMemo } from 'react';
-
 import { Button, ErrorState, ListSkeleton } from '@/shared/ui';
 
 import { EventsEmpty } from './EventsEmpty';
 import { EventsList } from './EventsList';
 import { useEventsFilters } from './filtersStore';
 import { ForYouEvents } from './ForYouEvents';
-import { MyEvents } from './MyEvents';
-import { OngoingStrip } from './OngoingStrip';
+import { MyEventsLink } from './MyEventsLink';
 import type { EventsFeed } from './useEventsFeed';
 import { useEventRecommendations } from './useEventRecommendations';
 import { useMarkerHighlight } from './useMarkerHighlight';
 
 /**
- * Body of the afisha: «Для вас», «Идёт сейчас», «Мои события», the day-grouped list and
- * paging, with loading, empty and error states.
+ * Body of the afisha: a quiet link to «Мои события», «Для вас», the day-grouped list (what is
+ * going on now leads today's group) and paging, with loading, empty and error states.
  */
 export function EventsResults({ feed }: { feed: EventsFeed }) {
   const sort = useEventsFilters((state) => state.sort);
@@ -28,14 +25,6 @@ export function EventsResults({ feed }: { feed: EventsFeed }) {
   // half-open sheet on a phone still shows events, not a banner.
   const invites = recommendations?.personalized === false;
 
-  const [ongoing, upcoming] = useMemo(() => {
-    if (!events || past) return [[], events ?? []];
-    return [
-      events.filter((place) => place.event?.phase === 'ongoing'),
-      events.filter((place) => place.event?.phase !== 'ongoing'),
-    ];
-  }, [events, past]);
-
   if (feed.isLoading) return <ListSkeleton rows={5} />;
   if (feed.isError || !events) {
     return <ErrorState error={feed.error} onRetry={() => void feed.refetch()} />;
@@ -43,15 +32,14 @@ export function EventsResults({ feed }: { feed: EventsFeed }) {
 
   return (
     <div ref={listRef} className="flex flex-col gap-3">
+      {!past && <MyEventsLink />}
       {!invites && forYou}
-      <OngoingStrip events={ongoing} />
-      {!past && <MyEvents />}
       {events.length === 0 ? (
         <EventsEmpty activeSearch={feed.activeSearch} />
       ) : (
-        upcoming.length > 0 && (
+        events.length > 0 && (
           <EventsList
-            events={upcoming}
+            events={events}
             grouped={sort === 'start'}
             distanceOrigin={feed.distanceOrigin}
             distanceOnly={radiusKm !== null}
@@ -60,7 +48,7 @@ export function EventsResults({ feed }: { feed: EventsFeed }) {
           />
         )
       )}
-      {invites && upcoming.length === 0 && forYou}
+      {invites && events.length === 0 && forYou}
       {feed.hasMore && (
         <Button
           variant="secondary"

@@ -7,13 +7,7 @@ import { cn } from '@/shared/lib/cn';
 import { Avatar, SPRING } from '@/shared/ui';
 
 import { TAB_BAR_HEIGHT } from './layout';
-import {
-  isNavItemActive,
-  PROBLEMS_NAV,
-  SAVED_NAV,
-  TAB_BAR_NAV,
-  useIsOverlayRoute,
-} from './navigation';
+import { isNavItemActive, MAIN_NAV, useIsInMore } from './navigation';
 import { UserMenu } from './UserMenu';
 
 const TAB =
@@ -31,16 +25,12 @@ function ActiveMark({ active }: { active: boolean }) {
   );
 }
 
-/** Phone tab bar: four sections and «Ещё» — the menu of the other sections and the account. */
+/** Phone tab bar: the three main sections and «Ещё» — the other sections and the account. */
 export function BottomBar() {
   const { pathname } = useLocation();
   const { user } = useAuth();
-  // «Ещё» holds the other sections and the account: problems, favourites, statistics,
-  // moderation, profile pages — it is the active tab while one of them is open.
-  const inMenu =
-    useIsOverlayRoute() ||
-    isNavItemActive(PROBLEMS_NAV, pathname) ||
-    isNavItemActive(SAVED_NAV, pathname);
+  // «Ещё» is the active tab while one of its sections or a profile page is open.
+  const inMenu = useIsInMore();
 
   return (
     <nav
@@ -48,7 +38,7 @@ export function BottomBar() {
       className="absolute inset-x-0 bottom-0 z-40 border-t border-line bg-surface pb-safe"
     >
       <div className="flex" style={{ height: TAB_BAR_HEIGHT }}>
-        {TAB_BAR_NAV.map((item) => {
+        {MAIN_NAV.map((item) => {
           const active = isNavItemActive(item, pathname);
           const Icon = item.icon;
           return (

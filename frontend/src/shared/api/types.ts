@@ -743,6 +743,27 @@ export interface PlacesQuery {
   limit?: number;
 }
 
+/** `GET /places/page` — the «Карта» list: every match city-wide, those in `view` first. */
+export interface PlacesPageQuery extends Omit<PlacesQuery, 'bbox' | 'near' | 'radius_m' | 'limit'> {
+  /** `minLng,minLat,maxLng,maxLat` of the visible map: these come first. */
+  view?: string;
+  /** `<lat>,<lng>` distances are measured from (the viewer or the map centre). */
+  center?: string;
+  /** `hide`: leave bare OpenStreetMap objects out, as the map does by default (SPEC §18). */
+  background?: 'show' | 'hide';
+  offset?: number;
+  /** Default 40, max 200. */
+  limit?: number;
+}
+
+export interface PlacePage {
+  /** Matches city-wide. */
+  total: number;
+  /** Of them in `view`; they come first. */
+  in_view: number;
+  items: PlaceCard[];
+}
+
 export interface EventRepeat {
   /** 1..30 */
   interval_days: number;

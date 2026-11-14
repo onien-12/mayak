@@ -279,7 +279,7 @@ interface ReputationEvent { id: number; delta: number; reason: string; message: 
 | POST  | `/users/{id}/respect`          | auth | → `UserProfile` (409 if already sent, 403 for newcomers, 429 daily limit) |
 | GET   | `/me/reputation?limit=50`      | auth | → `ReputationEvent[]` newest first |
 | GET   | `/me/favorites`                | auth | → `{ places: PlaceCard[]; routes: RouteCard[] }` |
-| GET   | `/me/events`                   | auth | → `PlaceCard[]` joined or organized, not finished, by start |
+| GET   | `/me/events`                   | auth | `?scope=upcoming` (default) · `past` → `PlaceCard[]` joined or organized: upcoming = not finished and not cancelled, by start; past = finished or cancelled, latest first (last 50) |
 | GET   | `/me/subscriptions`            | auth | → `Subscription[]` |
 | POST  | `/me/subscriptions`            | auth | `{ title, lat, lng, radius_m (200..10000), layers: Layer[] }` → `Subscription` (201), max 10 |
 | DELETE| `/me/subscriptions/{id}`       | auth | 204 |
@@ -311,6 +311,20 @@ interface ReputationEvent { id: number; delta: number; reason: string; message: 
 
 `hidden`/`archived` are never returned here. `pending` is returned only to its author
 (so they see their own submissions on the map).
+
+### `GET /places/page` (opt) → `PlacePage` — the «Карта» list
+
+Every place matching the `GET /places` filters (`layers`, `categories`, `min_status`, `q`, `tags`,
+`attrs`, `origin` …) city-wide, in pages. Additional params: `view` (`minLng,minLat,maxLng,maxLat`
+of the visible map: these come first), `center` (`lat,lng`: distances are measured from it),
+`background` = `show` (default) · `hide` (leave bare OpenStreetMap objects out, SPEC §18),
+`offset` (default 0), `limit` (default 40, max 200). Order: in `view` first, then residents'
+places before imported ones, then the nearest to `center`, then by id. With `min_status` other
+than `any`, unconfirmed OpenStreetMap objects are left out (as the map's trust filter does).
+
+```ts
+interface PlacePage { total: number; in_view: number; items: PlaceCard[]; }   // total city-wide; in_view of them in `view`
+```
 
 ### Areas (locations)
 
@@ -946,7 +960,7 @@ Behaviour the tables above leave open, as implemented:
   outages.
 - **`GET /events`**: `sort=price` puts unknown prices (`null`) last. `scope=past` means already ended (cancelled or not);
   a cancelled event that has not ended yet is in neither `upcoming` nor `past` (only `all`).
-  **`GET /me/events`** also returns own `pending` events; cancelled ones are left out.
+  **`GET /me/events`** also returns own `pending` events; cancelled ones are left out of `upcoming` and listed under `past`.
 - **Reviews** may be left on one's own place (not on one's own route: `403`).
 - **Routes**: `RouteStop.distance_from_prev_m` of a visible stop is measured from the previous
   *visible* stop (the legs across `via` points are summed); for a `via` point it is the distance
