@@ -16,9 +16,12 @@ export function LightboxThumbs({ photos, index, onSelect }: LightboxThumbsProps)
   const strip = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    strip.current
-      ?.querySelector('[aria-current="true"]')
-      ?.scrollIntoView({ block: 'nearest', inline: 'center' });
+    const row = strip.current;
+    const current = row?.querySelector<HTMLElement>('[aria-current="true"]');
+    if (!row || !current) return;
+    // Only the strip scrolls: `scrollIntoView` would also shift the whole viewer sideways.
+    const offset = current.getBoundingClientRect().left - row.getBoundingClientRect().left;
+    row.scrollTo({ left: row.scrollLeft + offset - (row.clientWidth - current.clientWidth) / 2 });
   }, [index]);
 
   return (
