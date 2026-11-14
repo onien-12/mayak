@@ -7,7 +7,17 @@ import { TagsInput } from '@/features/places';
 import { queryKeys, routesApi, type RouteDetail, type RouteDifficulty } from '@/shared/api';
 import { formatDistance, pluralize } from '@/shared/lib/format';
 import { ROUTE_DIFFICULTIES, ROUTE_DIFFICULTY_META } from '@/shared/lib/labels';
-import { Banner, Button, Chip, Field, Input, PanelLayout, Textarea } from '@/shared/ui';
+import {
+  Banner,
+  Button,
+  Chip,
+  Field,
+  HonestyCheck,
+  Input,
+  PanelLayout,
+  Textarea,
+  type HonestyPledge,
+} from '@/shared/ui';
 
 import { ROUTE_PLURALS } from '../lib/plurals';
 import { serverErrors, toRouteInput, validateDraft, visibleCount } from './model';
@@ -55,13 +65,22 @@ interface DetailsStepProps {
   onSaved: (route: RouteDetail) => void;
   /** Shown first in the form (where the draft is kept). */
   notice?: ReactNode;
+  /** «Мамой клянусь…» when this save publishes the route; `undefined` otherwise. */
+  pledge?: HonestyPledge;
 }
 
 /**
  * Step 2 «О маршруте»: name, difficulty, story, tips, tags and who sees it. How the route is
  * travelled is chosen once, on the first step, where the line is built for it.
  */
-export function DetailsStep({ title, routeId, preview, onSaved, notice }: DetailsStepProps) {
+export function DetailsStep({
+  title,
+  routeId,
+  preview,
+  onSaved,
+  notice,
+  pledge,
+}: DetailsStepProps) {
   const queryClient = useQueryClient();
   const { permissions } = useAuth();
   const draft = useBuilderStore((state) => state.draft);
@@ -97,7 +116,7 @@ export function DetailsStep({ title, routeId, preview, onSaved, notice }: Detail
     const found = validateDraft(draft);
     setErrors(found);
     if (found.stops) setStep('points');
-    else if (Object.keys(found).length === 0) save.mutate();
+    else if (Object.keys(found).length === 0 && (!pledge || pledge.confirm())) save.mutate();
   };
 
   return (
@@ -107,13 +126,16 @@ export function DetailsStep({ title, routeId, preview, onSaved, notice }: Detail
       onBack={() => setStep('points')}
       backLabel="К точкам"
       footer={
-        <Button type="submit" form={FORM_ID} block size="lg" loading={save.isPending}>
-          {submitLabel(
-            routeId !== null,
-            draft.visibility === 'public',
-            permissions?.publishes_directly ?? true,
-          )}
-        </Button>
+        <>
+          {pledge && <HonestyCheck pledge={pledge} className="mb-2" />}
+          <Button type="submit" form={FORM_ID} block size="lg" loading={save.isPending}>
+            {submitLabel(
+              routeId !== null,
+              draft.visibility === 'public',
+              permissions?.publishes_directly ?? true,
+            )}
+          </Button>
+        </>
       }
     >
       <form

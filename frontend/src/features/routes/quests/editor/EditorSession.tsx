@@ -6,7 +6,7 @@ import { useMapActions } from '@/features/map';
 import { queryKeys, rereadAfterCheck, type QuestEditor, type RouteVisibility } from '@/shared/api';
 import { formatRelative, pluralize } from '@/shared/lib/format';
 import { boundsOfPoints } from '@/shared/lib/geo';
-import { Banner, Button } from '@/shared/ui';
+import { Banner, Button, useHonestyPledge } from '@/shared/ui';
 
 import { useLeaveGuard } from '../../builder/useLeaveGuard';
 import { DraftStatus } from '../../drafts/DraftStatus';
@@ -84,6 +84,7 @@ export function EditorSession({ initial, questId, visibility }: EditorSessionPro
   const autosave = useQuestDraftAutosave(questId);
   const { restore, clear, flush, device } = autosave;
   const { fitBounds } = useMapActions();
+  const pledge = useHonestyPledge();
   const blocker = useLeaveGuard(active && dirty && savedId === null && movedTo === null, {
     unloadWarning: device.failed,
   });
@@ -164,6 +165,7 @@ export function EditorSession({ initial, questId, visibility }: EditorSessionPro
           visibility={visibility}
           onSaved={onSaved}
           notice={status}
+          pledge={visibility === 'public' ? undefined : pledge}
         />
       )}
       <LeaveDialog

@@ -6,7 +6,7 @@ import type { Category, Layer, PlaceDetail } from '@/shared/api';
 import { useCategories } from '@/shared/hooks';
 import type { LatLng } from '@/shared/lib/geo';
 import { LAYER_META } from '@/shared/lib/labels';
-import { ErrorState, PanelLayout, Skeleton } from '@/shared/ui';
+import { ErrorState, PanelLayout, Skeleton, useHonestyPledge } from '@/shared/ui';
 
 import { usePlace } from '../card/usePlace';
 import { CategoryStep } from './CategoryStep';
@@ -74,6 +74,8 @@ function Wizard({ preset, editing }: WizardProps) {
     editing ? valuesFromPlace(editing) : emptyValues(preset),
   );
   const { categories, isLoading: categoriesLoading } = useCategories();
+  // Kept by the wizard, not the details step: going back to the point does not reset it.
+  const pledge = useHonestyPledge();
   // A format chosen up front stands in for the category step until the author picks another.
   const presetCategory = preset.categorySlug
     ? categories.find((item) => item.slug === preset.categorySlug && item.layer === preset.layer)
@@ -206,6 +208,7 @@ function Wizard({ preset, editing }: WizardProps) {
         }}
         presetAreaId={preset.areaId}
         editing={editing}
+        pledge={editing ? undefined : pledge}
         defaultValues={
           state.address && !editing ? { ...defaults, address: state.address } : defaults
         }

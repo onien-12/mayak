@@ -259,6 +259,9 @@ Violations return HTTP 429 with a Russian explanation.
   (user, target). Reviews: one per (user, place) (upsert). Comments: 30 per hour.
 - Auth endpoints: per-IP sliding window (10 registrations/hour, 30 logins/10 min).
 - Registration: server-side arithmetic captcha (signed token, 5 min TTL) + honeypot field.
+- Honesty pledge (client only): publishing a new place, event, problem, route, quest or
+  lost-and-found post needs a ticked «Мамой клянусь…» box (a playful line drawn at random per
+  form); drafts and edits do not ask, and the tick is neither stored nor sent.
 
 Complaint weight = reporter level weight × reason weight
 (`inaccurate` 1.0, `outdated` 0.8, `duplicate` 0.6, `spam` 1.2, `offensive` 1.2, `rules` 1.0,

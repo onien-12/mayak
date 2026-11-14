@@ -22,11 +22,13 @@ import {
   Button,
   CategoryIcon,
   Field,
+  HonestyCheck,
   Input,
   PanelLayout,
   Textarea,
   usePanelStore,
   toast,
+  type HonestyPledge,
 } from '@/shared/ui';
 
 import { syncPlace } from '../card/usePlace';
@@ -134,6 +136,8 @@ interface DetailsStepProps {
   draft: PlaceDraft;
   /** The place being edited; `undefined` when creating. */
   editing: PlaceDetail | undefined;
+  /** «Мамой клянусь…» a new publication needs; `undefined` when editing. */
+  pledge: HonestyPledge | undefined;
   defaultValues: PlaceFormValues;
   /** «Добавить место сюда» from an area card: that area is preselected. */
   presetAreaId?: number;
@@ -147,6 +151,7 @@ export function DetailsStep({
   frame,
   draft,
   editing,
+  pledge,
   defaultValues,
   presetAreaId,
   onChangeCategory,
@@ -270,23 +275,28 @@ export function DetailsStep({
     <PanelLayout
       {...frame}
       footer={
-        <Button
-          type="submit"
-          form={FORM_ID}
-          block
-          size="lg"
-          loading={save.isPending}
-          disabled={blocked}
-        >
-          {editing ? 'Сохранить изменения' : 'Опубликовать'}
-        </Button>
+        <>
+          {pledge && <HonestyCheck pledge={pledge} className="mb-2" />}
+          <Button
+            type="submit"
+            form={FORM_ID}
+            block
+            size="lg"
+            loading={save.isPending}
+            disabled={blocked}
+          >
+            {editing ? 'Сохранить изменения' : 'Опубликовать'}
+          </Button>
+        </>
       }
     >
       <FormProvider {...form}>
         <form
           id={FORM_ID}
           noValidate
-          onSubmit={handleSubmit((values) => save.mutate(values), explain)}
+          onSubmit={handleSubmit((values) => {
+            if (!pledge || pledge.confirm()) save.mutate(values);
+          }, explain)}
           className="flex flex-col gap-4"
         >
           <div className="flex items-center gap-3 rounded-card bg-canvas p-2.5">

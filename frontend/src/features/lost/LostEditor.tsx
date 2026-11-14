@@ -12,12 +12,15 @@ import {
   Button,
   Chip,
   Field,
+  HonestyCheck,
   Input,
   PanelLayout,
   SegmentedControl,
   Textarea,
+  useHonestyPledge,
   usePanelStore,
   useSheetPeek,
+  type HonestyPledge,
 } from '@/shared/ui';
 
 import { LostCard } from './LostCard';
@@ -170,11 +173,12 @@ function EarlyMatches({ draft, point }: { draft: Draft; point: LatLng }) {
 interface DetailsStepProps {
   draft: Draft;
   point: LatLng;
+  pledge: HonestyPledge;
   onChange: (patch: Partial<Draft>) => void;
   onBack: () => void;
 }
 
-function DetailsStep({ draft, point, onChange, onBack }: DetailsStepProps) {
+function DetailsStep({ draft, point, pledge, onChange, onBack }: DetailsStepProps) {
   const navigate = useNavigate();
   const create = useCreateLostItem();
   const setSnap = usePanelStore((state) => state.setSnap);
@@ -186,7 +190,7 @@ function DetailsStep({ draft, point, onChange, onBack }: DetailsStepProps) {
   const ready = draft.category !== '' && titleOk && draft.happenedOn !== '';
 
   const submit = () => {
-    if (draft.category === '') return;
+    if (draft.category === '' || !pledge.confirm()) return;
     setError(null);
     create.mutate(
       {
@@ -220,16 +224,19 @@ function DetailsStep({ draft, point, onChange, onBack }: DetailsStepProps) {
         onBack={onBack}
         backLabel="К выбору места"
         footer={
-          <Button
-            block
-            size="lg"
-            icon={Send}
-            disabled={!ready}
-            loading={create.isPending}
-            onClick={submit}
-          >
-            Опубликовать
-          </Button>
+          <>
+            <HonestyCheck pledge={pledge} className="mb-2" />
+            <Button
+              block
+              size="lg"
+              icon={Send}
+              disabled={!ready}
+              loading={create.isPending}
+              onClick={submit}
+            >
+              Опубликовать
+            </Button>
+          </>
         }
       >
         <div className="flex flex-col gap-4">
@@ -336,6 +343,7 @@ function LostForm() {
   const presetCategory = params.get('category');
   const [step, setStep] = useState<'point' | 'details'>('point');
   const [point, setPoint] = useState<LatLng | null>(null);
+  const pledge = useHonestyPledge();
   const [draft, setDraft] = useState<Draft>(() => ({
     kind,
     category:
@@ -353,7 +361,13 @@ function LostForm() {
 
   if (step === 'details' && point) {
     return (
-      <DetailsStep draft={draft} point={point} onChange={change} onBack={() => setStep('point')} />
+      <DetailsStep
+        draft={draft}
+        point={point}
+        pledge={pledge}
+        onChange={change}
+        onBack={() => setStep('point')}
+      />
     );
   }
   return (

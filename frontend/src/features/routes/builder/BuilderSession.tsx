@@ -6,7 +6,7 @@ import { useMapActions } from '@/features/map';
 import type { RouteDetail } from '@/shared/api';
 import { formatRelative, pluralize } from '@/shared/lib/format';
 import { boundsOfPoints } from '@/shared/lib/geo';
-import { Banner, Button } from '@/shared/ui';
+import { Banner, Button, useHonestyPledge } from '@/shared/ui';
 
 import { DraftStatus } from '../drafts/DraftStatus';
 import { LeaveDialog } from '../drafts/LeaveDialog';
@@ -89,6 +89,7 @@ export function BuilderSession({ initial, routeId }: BuilderSessionProps) {
   const { restore, clear, flush, device } = autosave;
   const { fitBounds } = useMapActions();
   const preview = useRoutePreview(draft);
+  const pledge = useHonestyPledge();
   const blocker = useLeaveGuard(active && dirty && saved === null && movedTo === null, {
     unloadWarning: device.failed,
   });
@@ -133,6 +134,9 @@ export function BuilderSession({ initial, routeId }: BuilderSessionProps) {
 
   const close = () => navigate(routeId === null ? '/routes' : `/routes/${routeId}`);
   const status = <DraftStatus device={device} touched={dirty} account={account} />;
+  // Only a save that makes the route public for the first time is a publication.
+  const publishes =
+    draft.visibility === 'public' && (routeId === null || initial.visibility !== 'public');
 
   return (
     <>
@@ -165,6 +169,7 @@ export function BuilderSession({ initial, routeId }: BuilderSessionProps) {
           preview={preview}
           onSaved={onSaved}
           notice={status}
+          pledge={publishes ? pledge : undefined}
         />
       )}
       <StopEditor />

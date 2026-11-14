@@ -10,11 +10,13 @@ import {
   Button,
   Chip,
   Field,
+  HonestyCheck,
   Input,
   MapTopBar,
   PanelLayout,
   Textarea,
   usePanelStore,
+  type HonestyPledge,
 } from '@/shared/ui';
 import { useIsDesktop } from '@/shared/hooks';
 
@@ -39,10 +41,19 @@ interface DetailsStepProps {
   onSaved: (quest: QuestEditor) => void;
   /** Shown first in the form (where the draft is kept). */
   notice?: ReactNode;
+  /** «Мамой клянусь…» before the first publication; `undefined` for a published quest. */
+  pledge?: HonestyPledge;
 }
 
 /** Step 2 «О квесте»: name, story, where to gather, how long, cover — then save or publish. */
-export function DetailsStep({ title, questId, visibility, onSaved, notice }: DetailsStepProps) {
+export function DetailsStep({
+  title,
+  questId,
+  visibility,
+  onSaved,
+  notice,
+  pledge,
+}: DetailsStepProps) {
   const queryClient = useQueryClient();
   const draft = useQuestEditorStore((state) => state.draft);
   const errors = useQuestEditorStore((state) => state.errors);
@@ -73,11 +84,13 @@ export function DetailsStep({ title, questId, visibility, onSaved, notice }: Det
   const submit = (target: RouteVisibility) => {
     setFormError(null);
     const found = validateDraft(draft);
+    const valid = Object.keys(found).length === 0;
     setErrors(found);
     if (hasStageProblems(found)) showStageProblems(found);
-    else if (Object.keys(found).length === 0) save.mutate(target);
+    // A draft is kept without the pledge; only publishing asks for it.
+    else if (valid && (target !== 'public' || !pledge || pledge.confirm())) save.mutate(target);
     // Phones: the messages are in the sheet — lift it off its lowest snap.
-    if (Object.keys(found).length > 0) usePanelStore.getState().reveal();
+    if (!valid) usePanelStore.getState().reveal();
   };
 
   const published = visibility === 'public';
@@ -107,27 +120,30 @@ export function DetailsStep({ title, questId, visibility, onSaved, notice }: Det
         backLabel="К этапам"
         toolbar={isDesktop && startPrompt}
         footer={
-          <div className="flex gap-2">
-            <Button
-              size="lg"
-              variant="secondary"
-              icon={Lock}
-              className="flex-1"
-              disabled={busy}
-              onClick={() => submit('private')}
-            >
-              {published ? 'В черновики' : 'Черновик'}
-            </Button>
-            <Button
-              size="lg"
-              icon={Globe}
-              className="flex-1"
-              loading={busy}
-              onClick={() => submit('public')}
-            >
-              {published ? 'Сохранить' : 'Опубликовать'}
-            </Button>
-          </div>
+          <>
+            {pledge && <HonestyCheck pledge={pledge} className="mb-2" />}
+            <div className="flex gap-2">
+              <Button
+                size="lg"
+                variant="secondary"
+                icon={Lock}
+                className="flex-1"
+                disabled={busy}
+                onClick={() => submit('private')}
+              >
+                {published ? 'В черновики' : 'Черновик'}
+              </Button>
+              <Button
+                size="lg"
+                icon={Globe}
+                className="flex-1"
+                loading={busy}
+                onClick={() => submit('public')}
+              >
+                {published ? 'Сохранить' : 'Опубликовать'}
+              </Button>
+            </div>
+          </>
         }
       >
         <form

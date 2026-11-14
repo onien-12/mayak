@@ -19,6 +19,8 @@ export {
 } from './graphics';
 export { startGraphicsProbe } from './graphicsProbe';
 export { HeartButton } from './HeartButton';
+export { HonestyCheck } from './HonestyCheck';
+export { useHonestyPledge, type HonestyPledge } from './honestyPledge';
 export { IconButton, type IconButtonProps } from './IconButton';
 export { controlClasses, Input, type InputProps } from './Input';
 export { CategoryGlyph } from './CategoryGlyph';
