@@ -1,20 +1,23 @@
-import {
-  ArrowRight,
-  Hand,
-  Landmark,
-  LocateFixed,
-  MousePointerClick,
-  Search,
-  X,
-} from 'lucide-react';
+import { ArrowRight, Hand, Landmark, LocateFixed, Plus, Search, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useState, type ReactNode } from 'react';
 
 import { useIsDesktop } from '@/shared/hooks';
 import { formatDistance, plural, pluralize } from '@/shared/lib/format';
-import { Banner, Button, fadeVariants, MapTopBar, PanelLayout, usePanelStore } from '@/shared/ui';
+import {
+  Banner,
+  Button,
+  fadeVariants,
+  MapTopBar,
+  PanelLayout,
+  toast,
+  usePanelStore,
+} from '@/shared/ui';
 
 import { ROUTE_PLURALS } from '../lib/plurals';
+import { useVisibleCenter } from '../lib/visibleCenter';
+import { PlacementPrompt } from '../ui/PlacementPrompt';
+import { FULL_ROUTE_MESSAGE } from './actions';
 import { visibleCount } from './model';
 import { PathModeSwitch, PreviewSummary, RouteKindPicker } from './RouteSettings';
 import { SearchResults } from './SearchResults';
@@ -25,7 +28,7 @@ import { TOOL_HINTS } from './tools';
 import type { RoutePreviewState } from './useRoutePreview';
 
 const WAYS: { icon: typeof Hand; text: string }[] = [
-  { icon: MousePointerClick, text: 'Нажмите на карту — там появится точка' },
+  { icon: Plus, text: '«Добавить точку» — или просто нажмите на карту' },
   { icon: Search, text: 'Найдите место или адрес в поиске' },
   { icon: Landmark, text: '«Места» — выберите метку с карты' },
   { icon: LocateFixed, text: '«Я здесь» — точка там, где вы стоите' },
@@ -73,7 +76,9 @@ export function PointsStep({ title, preview, onClose, notice }: PointsStepProps)
   const tool = useBuilderStore((state) => state.tool);
   const stopsError = useBuilderStore((state) => state.errors.stops);
   const setStep = useBuilderStore((state) => state.setStep);
+  const placing = useBuilderStore((state) => state.placing);
   const reveal = usePanelStore((state) => state.reveal);
+  const visibleCenter = useVisibleCenter();
   const [query, setQuery] = useState('');
   const count = visibleCount(stops);
   const missing = Math.max(0, 2 - count);
@@ -84,6 +89,23 @@ export function PointsStep({ title, preview, onClose, notice }: PointsStepProps)
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
   };
 
+  const startPlacing = () => {
+    useBuilderStore.getState().setPlacing(true);
+    const panel = usePanelStore.getState();
+    if (panel.snap === 'full') panel.setSnap('half');
+  };
+  const placeInCenter = () => {
+    const point = visibleCenter(useBuilderStore.getState().draft.stops);
+    if (point && useBuilderStore.getState().addStop(point) === null) toast.info(FULL_ROUTE_MESSAGE);
+  };
+  const prompt = placing && (
+    <PlacementPrompt
+      text={`Нажмите на карту — там будет точка ${count + 1}`}
+      onCenter={placeInCenter}
+      onCancel={() => useBuilderStore.getState().setPlacing(false)}
+    />
+  );
+
   const subtitle =
     count === 0
       ? 'Добавьте первую точку'
@@ -92,7 +114,7 @@ export function PointsStep({ title, preview, onClose, notice }: PointsStepProps)
   return (
     <>
       {!isDesktop && (
-        <MapTopBar extra={<ToolChips floating />}>
+        <MapTopBar extra={prompt ? <div className="px-3">{prompt}</div> : <ToolChips floating />}>
           <StopSearchField pill value={query} onChange={setQuery} onFocus={reveal} />
         </MapTopBar>
       )}
@@ -102,25 +124,37 @@ export function PointsStep({ title, preview, onClose, notice }: PointsStepProps)
         onBack={onClose}
         backLabel="Закрыть конструктор"
         toolbar={
-          isDesktop && (
+          isDesktop &&
+          (prompt || (
             <div className="flex flex-col gap-3">
               <StopSearchField value={query} onChange={setQuery} />
               <ToolChips />
             </div>
-          )
+          ))
         }
         footer={
-          <Button
-            block
-            size="lg"
-            iconRight={ArrowRight}
-            disabled={missing > 0}
-            onClick={() => setStep('details')}
-          >
-            {missing > 0
-              ? `Ещё ${missing} ${plural(missing, ROUTE_PLURALS.point)} — и дальше`
-              : 'Далее: о маршруте'}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              size="lg"
+              icon={Plus}
+              variant={missing > 0 ? 'primary' : 'secondary'}
+              disabled={placing}
+              onClick={startPlacing}
+              className="flex-1"
+            >
+              Добавить точку
+            </Button>
+            <Button
+              size="lg"
+              iconRight={ArrowRight}
+              variant={missing > 0 ? 'secondary' : 'primary'}
+              disabled={missing > 0}
+              onClick={() => setStep('details')}
+              className="flex-1"
+            >
+              {missing > 0 ? `Ещё ${missing} ${plural(missing, ROUTE_PLURALS.point)}` : 'Далее'}
+            </Button>
+          </div>
         }
       >
         <div className="flex flex-col gap-5">

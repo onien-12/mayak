@@ -1,13 +1,16 @@
 import { History } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useCallback, useEffect, useEffectEvent, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router';
 
 import { useMapActions } from '@/features/map';
 import type { RouteDetail } from '@/shared/api';
 import { formatRelative, pluralize } from '@/shared/lib/format';
 import { boundsOfPoints } from '@/shared/lib/geo';
-import { Banner, Button, ConfirmDialog } from '@/shared/ui';
+import { Banner, Button } from '@/shared/ui';
 
+import { DraftStatus } from '../drafts/DraftStatus';
+import { LeaveDialog } from '../drafts/LeaveDialog';
+import type { StoredDraft } from '../drafts/storage';
 import { ROUTE_PLURALS } from '../lib/plurals';
 import { BuilderDone } from './BuilderDone';
 import { BuilderMapLayer } from './BuilderMapLayer';
@@ -16,7 +19,8 @@ import { visibleCount, type RouteDraft } from './model';
 import { PointsStep } from './PointsStep';
 import { StopEditor } from './StopEditor';
 import { useBuilderStore } from './store';
-import { clearStoredDraft, useDraftAutosave, type StoredDraft } from './useDraftAutosave';
+import { useAccountDraft } from './useAccountDraft';
+import { clearStoredDraft, useDraftAutosave } from './useDraftAutosave';
 import { useLeaveGuard } from './useLeaveGuard';
 import { useRoutePreview } from './useRoutePreview';
 
@@ -31,7 +35,7 @@ function RestorePrompt({
   onRestore,
   onDiscard,
 }: {
-  stored: StoredDraft;
+  stored: StoredDraft<RouteDraft>;
   onRestore: () => void;
   onDiscard: () => void;
 }) {
@@ -68,9 +72,11 @@ interface BuilderSessionProps {
   routeId: number | null;
 }
 
-/** One visit to the builder: steps, map layer, stop editor, autosave and the leave guard. */
+/** One visit to the builder: steps, map layer, stop editor, drafts and the leave guard. */
 export function BuilderSession({ initial, routeId }: BuilderSessionProps) {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const resume = params.get('draft') === '1';
   const [sessionId] = useState(nextSessionId);
   const active = useBuilderStore((state) => state.sessionId === sessionId);
   const step = useBuilderStore((state) => state.step);
@@ -78,15 +84,38 @@ export function BuilderSession({ initial, routeId }: BuilderSessionProps) {
   const dirty = useBuilderStore((state) => state.dirty);
   const editing = useBuilderStore((state) => state.editingId !== null);
   const [saved, setSaved] = useState<RouteDetail | null>(null);
+  const [movedTo, setMovedTo] = useState<number | null>(null);
   const autosave = useDraftAutosave(routeId);
+  const { restore, clear, flush, device } = autosave;
   const { fitBounds } = useMapActions();
   const preview = useRoutePreview(draft);
-  const blocker = useLeaveGuard(active && dirty && saved === null);
+  const blocker = useLeaveGuard(active && dirty && saved === null && movedTo === null, {
+    unloadWarning: device.failed,
+  });
   const title = routeId === null ? 'Новый маршрут' : 'Редактирование';
+  const account = useAccountDraft({
+    routeId,
+    saved: routeId === null ? null : initial.visibility,
+    onStored: clear,
+    onCreated: setMovedTo,
+  });
+
+  // «Продолжить» in «Черновики»: the device copy is the work, no second question.
+  const resumeDraft = useEffectEvent(() => {
+    if (!resume) return;
+    const bounds = boundsOfPoints(restore()?.stops ?? []);
+    if (bounds) fitBounds(bounds);
+  });
 
   useEffect(() => {
     useBuilderStore.getState().start(sessionId, initial);
+    resumeDraft();
   }, [sessionId, initial]);
+
+  // A new route saved as an account draft: go on editing it there (after the guard is off).
+  useEffect(() => {
+    if (movedTo !== null) navigate(`/routes/${movedTo}/edit`, { replace: true });
+  }, [movedTo, navigate]);
 
   const onSaved = useCallback(
     (route: RouteDetail) => {
@@ -103,6 +132,7 @@ export function BuilderSession({ initial, routeId }: BuilderSessionProps) {
   if (saved) return <BuilderDone route={saved} edited={routeId !== null} onOpen={openSaved} />;
 
   const close = () => navigate(routeId === null ? '/routes' : `/routes/${routeId}`);
+  const status = <DraftStatus device={device} touched={dirty} account={account} />;
 
   return (
     <>
@@ -113,31 +143,36 @@ export function BuilderSession({ initial, routeId }: BuilderSessionProps) {
           preview={preview}
           onClose={close}
           notice={
-            autosave.stored &&
-            !dirty && (
-              <RestorePrompt
-                stored={autosave.stored}
-                onRestore={() => {
-                  const bounds = boundsOfPoints(autosave.restore()?.stops ?? []);
-                  if (bounds) fitBounds(bounds);
-                }}
-                onDiscard={autosave.discard}
-              />
-            )
+            <>
+              {autosave.stored && !dirty && (
+                <RestorePrompt
+                  stored={autosave.stored}
+                  onRestore={() => {
+                    const bounds = boundsOfPoints(restore()?.stops ?? []);
+                    if (bounds) fitBounds(bounds);
+                  }}
+                  onDiscard={autosave.discard}
+                />
+              )}
+              {status}
+            </>
           }
         />
       ) : (
-        <DetailsStep title={title} routeId={routeId} preview={preview} onSaved={onSaved} />
+        <DetailsStep
+          title={title}
+          routeId={routeId}
+          preview={preview}
+          onSaved={onSaved}
+          notice={status}
+        />
       )}
       <StopEditor />
-      <ConfirmDialog
-        open={blocker.state === 'blocked'}
-        onClose={() => blocker.reset?.()}
-        onConfirm={() => blocker.proceed?.()}
+      <LeaveDialog
+        blocker={blocker}
+        flush={flush}
+        failed={device.failed}
         title="Выйти из конструктора?"
-        description="Изменения не сохранены на сервере, но черновик останется на этом устройстве — к нему можно вернуться."
-        confirmLabel="Выйти"
-        cancelLabel="Остаться"
       />
     </>
   );

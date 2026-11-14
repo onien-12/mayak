@@ -2,7 +2,7 @@ import { ArrowRight, Plus, RotateCcw, Route as RouteIcon, X } from 'lucide-react
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 
-import { requireAuth, useAuth } from '@/features/auth';
+import { useAuth } from '@/features/auth';
 import type { RouteCard } from '@/shared/api';
 import { useIsDesktop } from '@/shared/hooks';
 import { formatDistance, formatDuration, pluralize, PLURALS } from '@/shared/lib/format';
@@ -28,6 +28,9 @@ import { DifficultyAndSort, KindChips, RouteSearchField } from './catalog/Catalo
 import { countCatalogFilters, useCatalogFilters, type CatalogScope } from './catalog/catalogStore';
 import { RouteListItem } from './catalog/RouteListItem';
 import { useRoutesCatalog } from './catalog/useRoutesCatalog';
+import { CatalogDrafts } from './drafts/CatalogDrafts';
+import { StartNewDialog } from './drafts/StartNewDialog';
+import { useStartNew } from './drafts/useStartNew';
 import { QuestsCatalog } from './quests/catalog/QuestsCatalog';
 
 function catalogTitle(count: number | undefined, mine: boolean): string {
@@ -51,7 +54,8 @@ function RoutesCatalog() {
   const [previewed, setPreviewed] = useState<RouteCard | null>(null);
   const activeFilters = countCatalogFilters(filters);
 
-  const create = () => requireAuth(() => navigate('/routes/new'), 'чтобы собрать свой маршрут');
+  const startNew = useStartNew('route', '/routes/new', 'чтобы собрать свой маршрут');
+  const create = startNew.start;
 
   const preview = (route: RouteCard | null) => {
     setPreviewed(route);
@@ -96,6 +100,7 @@ function RoutesCatalog() {
           ]}
         />
       )}
+      <CatalogDrafts kind="route" />
       {/* Phones: the kind filter belongs to the list it filters, not to the map above it. */}
       {!isDesktop && <KindChips />}
       <DifficultyAndSort sortable={!catalog.mine} />
@@ -188,6 +193,7 @@ function RoutesCatalog() {
       >
         {list}
       </PanelLayout>
+      {startNew.choice && <StartNewDialog {...startNew.choice} />}
     </>
   );
 }

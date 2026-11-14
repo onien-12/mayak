@@ -1,26 +1,26 @@
 import { History } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useCallback, useEffect, useEffectEvent, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router';
 
 import { useMapActions } from '@/features/map';
 import { queryKeys, rereadAfterCheck, type QuestEditor, type RouteVisibility } from '@/shared/api';
 import { formatRelative, pluralize } from '@/shared/lib/format';
 import { boundsOfPoints } from '@/shared/lib/geo';
-import { Banner, Button, ConfirmDialog } from '@/shared/ui';
+import { Banner, Button } from '@/shared/ui';
 
 import { useLeaveGuard } from '../../builder/useLeaveGuard';
+import { DraftStatus } from '../../drafts/DraftStatus';
+import { LeaveDialog } from '../../drafts/LeaveDialog';
+import type { StoredDraft } from '../../drafts/storage';
 import { QUEST_PLURALS } from '../lib/meta';
 import { DetailsStep } from './DetailsStep';
 import { EditorMapLayer } from './EditorMapLayer';
 import type { QuestDraft } from './model';
+import { useAccountDraft } from './useAccountDraft';
 import { StageSheet } from './StageSheet';
 import { StagesStep } from './StagesStep';
 import { useQuestEditorStore } from './store';
-import {
-  clearStoredQuestDraft,
-  useQuestDraftAutosave,
-  type StoredQuestDraft,
-} from './useQuestDraftAutosave';
+import { clearStoredQuestDraft, useQuestDraftAutosave } from './useQuestDraftAutosave';
 
 let sessions = 0;
 const nextSessionId = () => {
@@ -33,7 +33,7 @@ function RestorePrompt({
   onRestore,
   onDiscard,
 }: {
-  stored: StoredQuestDraft;
+  stored: StoredDraft<QuestDraft>;
   onRestore: () => void;
   onDiscard: () => void;
 }) {
@@ -70,22 +70,51 @@ interface EditorSessionProps {
   visibility: RouteVisibility | null;
 }
 
-/** One visit to the quest editor: steps, map layer, stage sheet, autosave and the leave guard. */
+/** One visit to the quest editor: steps, map layer, stage sheet, drafts and the leave guard. */
 export function EditorSession({ initial, questId, visibility }: EditorSessionProps) {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const resume = params.get('draft') === '1';
   const [sessionId] = useState(nextSessionId);
   const active = useQuestEditorStore((state) => state.sessionId === sessionId);
   const step = useQuestEditorStore((state) => state.step);
   const dirty = useQuestEditorStore((state) => state.dirty);
   const editing = useQuestEditorStore((state) => state.editingId !== null);
   const [savedId, setSavedId] = useState<number | null>(null);
+  const [movedTo, setMovedTo] = useState<number | null>(null);
   const autosave = useQuestDraftAutosave(questId);
+  const { restore, clear, flush, device } = autosave;
   const { fitBounds } = useMapActions();
-  const blocker = useLeaveGuard(active && dirty && savedId === null);
+  const blocker = useLeaveGuard(active && dirty && savedId === null && movedTo === null, {
+    unloadWarning: device.failed,
+  });
   const title = questId === null ? 'Новый квест' : 'Редактирование квеста';
+  const account = useAccountDraft({
+    questId,
+    saved: visibility,
+    onStored: clear,
+    onCreated: setMovedTo,
+  });
+
+  const frame = useCallback(
+    (restored: QuestDraft | null) => {
+      const bounds = boundsOfPoints([
+        ...(restored?.start ? [restored.start] : []),
+        ...(restored?.stages ?? []),
+      ]);
+      if (bounds) fitBounds(bounds, { maxZoom: 16 });
+    },
+    [fitBounds],
+  );
+
+  // «Продолжить» in «Черновики»: the device copy is the work, no second question.
+  const resumeDraft = useEffectEvent(() => {
+    if (resume) frame(restore());
+  });
 
   useEffect(() => {
     useQuestEditorStore.getState().start(sessionId, initial);
+    resumeDraft();
   }, [sessionId, initial]);
 
   const onSaved = useCallback(
@@ -101,9 +130,13 @@ export function EditorSession({ initial, questId, visibility }: EditorSessionPro
   useEffect(() => {
     if (savedId !== null) navigate(`/quests/${savedId}`, { replace: true });
   }, [savedId, navigate]);
+  useEffect(() => {
+    if (movedTo !== null) navigate(`/quests/${movedTo}/edit`, { replace: true });
+  }, [movedTo, navigate]);
 
   if (!active) return null;
   const close = () => navigate(questId === null ? '/routes?view=quests' : `/quests/${questId}`);
+  const status = <DraftStatus device={device} touched={dirty} account={account} />;
 
   return (
     <>
@@ -113,32 +146,33 @@ export function EditorSession({ initial, questId, visibility }: EditorSessionPro
           title={title}
           onClose={close}
           notice={
-            autosave.stored &&
-            !dirty && (
-              <RestorePrompt
-                stored={autosave.stored}
-                onRestore={() => {
-                  const restored = autosave.restore();
-                  const bounds = boundsOfPoints(restored?.stages ?? []);
-                  if (bounds) fitBounds(bounds, { maxZoom: 16 });
-                }}
-                onDiscard={autosave.discard}
-              />
-            )
+            <>
+              {autosave.stored && !dirty && (
+                <RestorePrompt
+                  stored={autosave.stored}
+                  onRestore={() => frame(restore())}
+                  onDiscard={autosave.discard}
+                />
+              )}
+              {status}
+            </>
           }
         />
       ) : (
-        <DetailsStep title={title} questId={questId} visibility={visibility} onSaved={onSaved} />
+        <DetailsStep
+          title={title}
+          questId={questId}
+          visibility={visibility}
+          onSaved={onSaved}
+          notice={status}
+        />
       )}
       <StageSheet />
-      <ConfirmDialog
-        open={blocker.state === 'blocked'}
-        onClose={() => blocker.reset?.()}
-        onConfirm={() => blocker.proceed?.()}
-        title="Выйти из редактора?"
-        description="Изменения не сохранены на сервере, но черновик останется на этом устройстве — к нему можно вернуться."
-        confirmLabel="Выйти"
-        cancelLabel="Остаться"
+      <LeaveDialog
+        blocker={blocker}
+        flush={flush}
+        failed={device.failed}
+        title="Выйти из редактора квеста?"
       />
     </>
   );

@@ -62,6 +62,11 @@ export interface RouteDraft {
 export type DraftField = 'title' | 'description' | 'tips' | 'tags' | 'stops';
 export type DraftErrors = Partial<Record<DraftField, string>>;
 
+/** A route draft read back from the device (shape check only). */
+export function isRouteDraft(value: unknown): value is RouteDraft {
+  return typeof value === 'object' && value !== null && Array.isArray((value as RouteDraft).stops);
+}
+
 export function emptyDraft(): RouteDraft {
   return {
     title: '',

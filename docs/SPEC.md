@@ -425,6 +425,12 @@ linked to a map place. `via` waypoints are invisible shaping points for trails.
 - «Пройти маршрут» mode on the phone: current stop, landmark to the next one, distance to it
   from the user's geolocation, progress.
 - Quests (§27) live in the same section behind the switch «Маршруты | Квесты».
+- Drafts (routes and quests alike): unfinished work is kept on the device after every change
+  («Черновик сохранён на этом устройстве · 2 минуты назад»; one new draft per kind plus one per
+  edited route or quest) and can be saved to the account as a private route / quest
+  («Сохранить черновик в аккаунт», with what is still missing said plainly). «Маршруты» lists both
+  under «Черновики» (each view its own kind) with «Продолжить» / «Удалить»; «Создать» asks whether
+  to continue an unfinished new draft; saving to the account or publishing removes the device copy.
 
 ## 13. Tap anywhere: the "spot" sheet and notes
 

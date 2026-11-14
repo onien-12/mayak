@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 
 import { useMapActions } from '@/features/map';
-import { requireAuth, useAuth } from '@/features/auth';
+import { useAuth } from '@/features/auth';
 import type { QuestSort } from '@/shared/api';
 import { useDebouncedValue, useIsDesktop } from '@/shared/hooks';
 import { pluralize } from '@/shared/lib/format';
@@ -22,6 +22,9 @@ import {
 } from '@/shared/ui';
 
 import { CatalogSwitch } from '../../catalog/CatalogSwitch';
+import { CatalogDrafts } from '../../drafts/CatalogDrafts';
+import { StartNewDialog } from '../../drafts/StartNewDialog';
+import { useStartNew } from '../../drafts/useStartNew';
 import { QUEST_PLURALS } from '../lib/meta';
 import { StartMarker } from '../QuestMarkers';
 import { useQuestsCatalog } from '../useQuests';
@@ -57,7 +60,8 @@ export function QuestsCatalog() {
     framed.current = true;
   }, [quests, ready, fitBounds]);
 
-  const create = () => requireAuth(() => navigate('/quests/new'), 'чтобы придумать свой квест');
+  const startNew = useStartNew('quest', '/quests/new', 'чтобы придумать свой квест');
+  const create = startNew.start;
 
   const searchField = (
     <Input
@@ -109,6 +113,7 @@ export function QuestsCatalog() {
               ]}
             />
           )}
+          <CatalogDrafts kind="quest" />
           {!isDesktop && searchField}
           {!mine && (
             <SegmentedControl<QuestSort>
@@ -151,6 +156,7 @@ export function QuestsCatalog() {
           )}
         </div>
       </PanelLayout>
+      {startNew.choice && <StartNewDialog {...startNew.choice} />}
     </>
   );
 }

@@ -1,18 +1,20 @@
-import { ArrowRight, Flag, Hand, MousePointerClick, Puzzle, X } from 'lucide-react';
+import { ArrowRight, Flag, Hand, MousePointerClick, Plus, Puzzle, X } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { plural } from '@/shared/lib/format';
-import { Banner, Button, Chip, MapTopBar, PanelLayout, usePanelStore } from '@/shared/ui';
+import { Banner, Button, Chip, MapTopBar, PanelLayout, toast, usePanelStore } from '@/shared/ui';
 import { useIsDesktop } from '@/shared/hooks';
 
+import { useVisibleCenter } from '../../lib/visibleCenter';
+import { PlacementPrompt } from '../../ui/PlacementPrompt';
 import { QUEST_PLURALS } from '../lib/meta';
-import { MIN_STAGES } from './model';
+import { MAX_STAGES, MIN_STAGES } from './model';
 import { StageList } from './StageList';
 import { useQuestEditorStore, type EditorTool } from './store';
 
 const STEPS = [
   'Отметьте на карте, где игроки соберутся — инструмент «Старт».',
-  'Нажимайте на карту по порядку: каждая точка — этап квеста.',
+  '«Добавить этап» — и нажмите на карту, где он будет. Так этап за этапом, по порядку.',
   'В каждом этапе напишите загадку и выберите, как игрок докажет, что нашёл место.',
   'Сохраните черновик и пройдите квест сами — кнопкой «Пройти как игрок».',
 ];
@@ -66,12 +68,33 @@ export function StagesStep({ title, onClose, notice }: StagesStepProps) {
   const tool = useQuestEditorStore((state) => state.tool);
   const errors = useQuestEditorStore((state) => state.errors);
   const setStep = useQuestEditorStore((state) => state.setStep);
+  const placing = useQuestEditorStore((state) => state.placing);
+  const visibleCenter = useVisibleCenter();
   const missing = Math.max(0, MIN_STAGES - stages.length);
+
+  const startPlacing = () => {
+    useQuestEditorStore.getState().setPlacing(true);
+    const panel = usePanelStore.getState();
+    if (panel.snap === 'full') panel.setSnap('half');
+  };
+  const placeInCenter = () => {
+    const point = visibleCenter(useQuestEditorStore.getState().draft.stages);
+    if (point && useQuestEditorStore.getState().addStage(point) === null) {
+      toast.info(`В квесте может быть до ${MAX_STAGES} этапов`);
+    }
+  };
+  const prompt = placing && (
+    <PlacementPrompt
+      text={`Нажмите на карту — там будет этап ${stages.length + 1}`}
+      onCenter={placeInCenter}
+      onCancel={() => useQuestEditorStore.getState().setPlacing(false)}
+    />
+  );
 
   return (
     <>
       {!isDesktop && (
-        <MapTopBar extra={<ToolChips floating />}>
+        <MapTopBar extra={prompt ? <div className="px-3">{prompt}</div> : <ToolChips floating />}>
           <p className="flex h-11 items-center gap-2 rounded-full bg-surface/95 px-4 text-sm font-medium text-ink shadow-float">
             <MousePointerClick size={16} aria-hidden className="shrink-0 text-event" />
             {tool === 'start' ? 'Нажмите на карту, где старт' : 'Нажмите на карту, где этап'}
@@ -87,19 +110,30 @@ export function StagesStep({ title, onClose, notice }: StagesStepProps) {
         }
         onBack={onClose}
         backLabel="Закрыть редактор"
-        toolbar={isDesktop && <ToolChips />}
+        toolbar={isDesktop && (prompt || <ToolChips />)}
         footer={
-          <Button
-            block
-            size="lg"
-            iconRight={ArrowRight}
-            disabled={missing > 0}
-            onClick={() => setStep('details')}
-          >
-            {missing > 0
-              ? `Ещё ${missing} ${plural(missing, QUEST_PLURALS.stage)} — и дальше`
-              : 'Далее: о квесте'}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              size="lg"
+              icon={Plus}
+              variant={missing > 0 ? 'primary' : 'secondary'}
+              disabled={placing}
+              onClick={startPlacing}
+              className="flex-1"
+            >
+              Добавить этап
+            </Button>
+            <Button
+              size="lg"
+              iconRight={ArrowRight}
+              variant={missing > 0 ? 'secondary' : 'primary'}
+              disabled={missing > 0}
+              onClick={() => setStep('details')}
+              className="flex-1"
+            >
+              {missing > 0 ? `Ещё ${missing} ${plural(missing, QUEST_PLURALS.stage)}` : 'Далее'}
+            </Button>
+          </div>
         }
       >
         <div className="flex flex-col gap-4">

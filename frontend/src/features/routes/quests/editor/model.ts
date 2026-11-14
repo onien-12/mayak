@@ -70,6 +70,11 @@ const nextId = () => {
   return `stage-${Date.now().toString(36)}-${counter}`;
 };
 
+/** A quest draft read back from the device (shape check only). */
+export function isQuestDraft(value: unknown): value is QuestDraft {
+  return typeof value === 'object' && value !== null && Array.isArray((value as QuestDraft).stages);
+}
+
 export function emptyDraft(): QuestDraft {
   return {
     title: '',

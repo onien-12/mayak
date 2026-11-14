@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Flag, Globe, Lock, MapPinned, Pencil } from 'lucide-react';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import { PhotoPicker } from '@/features/places';
 import { queryKeys, questsApi, type QuestEditor, type RouteVisibility } from '@/shared/api';
@@ -32,10 +32,12 @@ interface DetailsStepProps {
   /** Visibility of the quest being edited; `null` for a new one. */
   visibility: RouteVisibility | null;
   onSaved: (quest: QuestEditor) => void;
+  /** Shown first in the form (where the draft is kept). */
+  notice?: ReactNode;
 }
 
 /** Step 2 «О квесте»: name, story, where to gather, how long, cover — then save or publish. */
-export function DetailsStep({ title, questId, visibility, onSaved }: DetailsStepProps) {
+export function DetailsStep({ title, questId, visibility, onSaved, notice }: DetailsStepProps) {
   const queryClient = useQueryClient();
   const draft = useQuestEditorStore((state) => state.draft);
   const errors = useQuestEditorStore((state) => state.errors);
@@ -105,6 +107,7 @@ export function DetailsStep({ title, questId, visibility, onSaved }: DetailsStep
       }
     >
       <form noValidate onSubmit={(event) => event.preventDefault()} className="flex flex-col gap-5">
+        {notice}
         <button
           type="button"
           onClick={() => setStep('stages')}

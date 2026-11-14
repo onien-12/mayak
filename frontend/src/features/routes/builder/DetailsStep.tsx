@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { MapPinned, Pencil } from 'lucide-react';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import { useAuth } from '@/features/auth';
 import { TagsInput } from '@/features/places';
@@ -53,13 +53,15 @@ interface DetailsStepProps {
   routeId: number | null;
   preview: RoutePreviewState;
   onSaved: (route: RouteDetail) => void;
+  /** Shown first in the form (where the draft is kept). */
+  notice?: ReactNode;
 }
 
 /**
  * Step 2 «О маршруте»: name, difficulty, story, tips, tags and who sees it. How the route is
  * travelled is chosen once, on the first step, where the line is built for it.
  */
-export function DetailsStep({ title, routeId, preview, onSaved }: DetailsStepProps) {
+export function DetailsStep({ title, routeId, preview, onSaved, notice }: DetailsStepProps) {
   const queryClient = useQueryClient();
   const { permissions } = useAuth();
   const draft = useBuilderStore((state) => state.draft);
@@ -123,6 +125,7 @@ export function DetailsStep({ title, routeId, preview, onSaved }: DetailsStepPro
         }}
         className="flex flex-col gap-5"
       >
+        {notice}
         <button
           type="button"
           onClick={() => setStep('points')}

@@ -35,6 +35,8 @@ interface BuilderState {
   selectedId: string | null;
   /** Index the next stop is inserted at («вставить между»); `null` appends. */
   insertAt: number | null;
+  /** «Добавить точку» pressed: waiting for a tap on the map (or «в центре карты»). */
+  placing: boolean;
   errors: DraftErrors;
 
   start: (sessionId: number, draft: RouteDraft) => void;
@@ -53,6 +55,7 @@ interface BuilderState {
   openEditor: (id: string | null) => void;
   select: (id: string | null) => void;
   setInsertAt: (index: number | null) => void;
+  setPlacing: (placing: boolean) => void;
   setErrors: (errors: DraftErrors) => void;
   markSaved: () => void;
 }
@@ -81,6 +84,7 @@ export const useBuilderStore = create<BuilderState>((set, get) => {
     editingId: null,
     selectedId: null,
     insertAt: null,
+    placing: false,
     errors: {},
 
     start: (sessionId, draft) =>
@@ -93,6 +97,7 @@ export const useBuilderStore = create<BuilderState>((set, get) => {
         editingId: null,
         selectedId: null,
         insertAt: null,
+        placing: false,
         errors: {},
       }),
 
@@ -113,6 +118,7 @@ export const useBuilderStore = create<BuilderState>((set, get) => {
       changeStops(insertStop(draft.stops, stop, index), {
         selectedId: stop.id,
         insertAt: insertAt === null ? null : insertAt + 1,
+        placing: false,
       });
       return stop.id;
     },
@@ -142,11 +148,12 @@ export const useBuilderStore = create<BuilderState>((set, get) => {
 
     reorder: (ids) => changeStops(reorderStops(get().draft.stops, ids)),
 
-    setStep: (step) => set({ step, editingId: null, insertAt: null }),
+    setStep: (step) => set({ step, editingId: null, insertAt: null, placing: false }),
     setTool: (tool) => set({ tool, insertAt: tool === 'via' ? null : get().insertAt }),
     openEditor: (id) => set({ editingId: id, selectedId: id ?? get().selectedId }),
     select: (id) => set({ selectedId: id }),
     setInsertAt: (insertAt) => set({ insertAt, tool: 'stop' }),
+    setPlacing: (placing) => set(placing ? { placing, tool: 'stop' } : { placing }),
     setErrors: (errors) => set({ errors }),
     markSaved: () => set({ dirty: false }),
   };

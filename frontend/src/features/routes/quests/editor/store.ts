@@ -24,6 +24,8 @@ interface EditorState {
   step: EditorStep;
   tool: EditorTool;
   editingId: string | null;
+  /** «Добавить этап» pressed: waiting for a tap on the map (or «в центре карты»). */
+  placing: boolean;
   errors: DraftErrors;
 
   start: (sessionId: number, draft: QuestDraft) => void;
@@ -38,6 +40,7 @@ interface EditorState {
   reorder: (ids: readonly string[]) => void;
   setStep: (step: EditorStep) => void;
   setTool: (tool: EditorTool) => void;
+  setPlacing: (placing: boolean) => void;
   openEditor: (id: string | null) => void;
   setErrors: (errors: DraftErrors) => void;
   markSaved: () => void;
@@ -62,6 +65,7 @@ export const useQuestEditorStore = create<EditorState>((set, get) => {
     step: 'stages',
     tool: 'stage',
     editingId: null,
+    placing: false,
     errors: {},
 
     start: (sessionId, draft) =>
@@ -72,6 +76,7 @@ export const useQuestEditorStore = create<EditorState>((set, get) => {
         step: 'stages',
         tool: draft.start ? 'stage' : 'start',
         editingId: null,
+        placing: false,
         errors: {},
       }),
 
@@ -87,7 +92,7 @@ export const useQuestEditorStore = create<EditorState>((set, get) => {
       const { draft } = get();
       if (draft.stages.length >= MAX_STAGES) return null;
       const stage = createStage(point, { objectId });
-      changeStages([...draft.stages, stage], { editingId: stage.id });
+      changeStages([...draft.stages, stage], { editingId: stage.id, placing: false });
       return stage.id;
     },
 
@@ -129,8 +134,9 @@ export const useQuestEditorStore = create<EditorState>((set, get) => {
       changeStages(ids.flatMap((id) => byId.get(id) ?? []));
     },
 
-    setStep: (step) => set({ step, editingId: null }),
-    setTool: (tool) => set({ tool }),
+    setStep: (step) => set({ step, editingId: null, placing: false }),
+    setTool: (tool) => set({ tool, placing: false }),
+    setPlacing: (placing) => set(placing ? { placing, tool: 'stage' } : { placing }),
     openEditor: (id) => set({ editingId: id }),
     setErrors: (errors) => set({ errors }),
     markSaved: () => set({ dirty: false }),
