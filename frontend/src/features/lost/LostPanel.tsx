@@ -12,7 +12,7 @@ import { useNavigate } from 'react-router';
 import { requireAuth, useAuth } from '@/features/auth';
 import { MapCircle } from '@/features/map';
 import type { LostKind } from '@/shared/api';
-import { useIsDesktop } from '@/shared/hooks';
+import { useIsDesktop, useRevealOnOpen } from '@/shared/hooks';
 import { cn } from '@/shared/lib/cn';
 import { plural } from '@/shared/lib/format';
 import {
@@ -140,6 +140,8 @@ export default function LostPanel() {
   const [area, setArea] = useState<SearchArea | null>(null);
   const [searchOpen, setSearchOpen] = useState(isDesktop);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const filtersRef = useRevealOnOpen<HTMLElement>(filtersOpen);
+  const searchRef = useRevealOnOpen<HTMLDivElement>(searchOpen);
   const activeFilters = countActiveFilters(filters);
   const hiddenFilters =
     (filters.categories.length > 0 ? 1 : 0) + (filters.period !== 'all' ? 1 : 0);
@@ -229,12 +231,13 @@ export default function LostPanel() {
       >
         <div className="flex flex-col gap-4">
           {searchOpen && (
-            <div id={SEARCH_ID} className="animate-fade-in">
+            <div ref={searchRef} id={SEARCH_ID} className="animate-fade-in">
               <LostSearch onArea={setArea} />
             </div>
           )}
           {filtersOpen && (
             <section
+              ref={filtersRef}
               id={FILTERS_ID}
               aria-label="Категория и период"
               className="animate-fade-in rounded-card border border-line/70 p-3.5"

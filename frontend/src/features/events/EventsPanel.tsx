@@ -3,7 +3,7 @@ import { useState } from 'react';
 
 import { useSearchSignal } from '@/features/interests';
 import { useMapPlaces } from '@/features/map';
-import { useIsDesktop } from '@/shared/hooks';
+import { useIsDesktop, useRevealOnOpen } from '@/shared/hooks';
 import { cn } from '@/shared/lib/cn';
 import { plural, PLURALS } from '@/shared/lib/format';
 import { Button, IconButton, PanelLayout, Spinner, usePanelStore } from '@/shared/ui';
@@ -77,6 +77,7 @@ export default function EventsPanel() {
   const filters = useEventsFilters();
   const feed = useEventsFeed();
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const filtersRef = useRevealOnOpen<HTMLElement>(filtersOpen);
   useMapPlaces(feed.events);
   useSearchSignal(filters.search);
 
@@ -127,6 +128,7 @@ export default function EventsPanel() {
       <div className="flex flex-col gap-4">
         {filtersOpen && (
           <section
+            ref={filtersRef}
             id={FILTERS_ID}
             aria-label="Фильтры и сортировка"
             className="animate-fade-in rounded-card border border-line/70 p-3.5"

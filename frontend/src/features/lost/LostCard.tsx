@@ -68,7 +68,6 @@ export function LostCard({ item, reason }: LostCardProps) {
           {item.state !== 'active' && (
             <span className="truncate text-xs text-ink-faint">{LOST_STATE_LABELS[item.state]}</span>
           )}
-          {item.on_review && <OnReviewMark />}
         </span>
         <span className="line-clamp-2 text-sm leading-snug font-semibold text-ink">
           {item.title}
@@ -77,6 +76,8 @@ export function LostCard({ item, reason }: LostCardProps) {
           {category} · {happenedLabel(item.kind, item.happened_on).toLowerCase()} ·{' '}
           {formatRelative(item.created_at)}
         </span>
+        {/* On its own line: the mark is longer than the room next to the kind badge. */}
+        {item.on_review && <OnReviewMark className="self-start" />}
         {reason && <span className="text-xs font-medium text-success-ink">{reason}</span>}
       </span>
     </Link>
